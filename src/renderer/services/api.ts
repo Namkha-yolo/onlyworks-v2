@@ -7,8 +7,20 @@
  * TODO: Implement window.api interface in preload.js
  */
 
+// Import auth types
+import { AuthSession } from '../stores/authStore';
+
 // Type definitions for the IPC API
 export interface ElectronAPI {
+  // Authentication
+  initOAuth: (provider: string) => Promise<string>;
+  openOAuthWindow: (authUrl: string) => Promise<AuthSession | null>;
+  clearSession: () => Promise<void>;
+  getStoredSession: () => Promise<AuthSession | null>;
+  storeSession: (session: AuthSession) => Promise<void>;
+  validateSession: (session: AuthSession) => Promise<boolean>;
+  refreshAuthToken: (refreshToken: string) => Promise<AuthSession | null>;
+
   // Session management
   startSession: (goal: string) => Promise<any>;
   stopSession: (sessionId: string) => Promise<void>;
@@ -38,6 +50,70 @@ export interface ElectronAPI {
 
 // Mock API for development (until IPC is implemented)
 const mockAPI: ElectronAPI = {
+  // Authentication mocks
+  initOAuth: async (provider: string) => {
+    console.log('[API] Initiating OAuth for provider:', provider);
+    // Return a mock OAuth URL that would normally come from the server
+    return Promise.resolve(`https://accounts.google.com/oauth/authorize?client_id=mock&redirect_uri=http://localhost:3000/api/auth/callback&response_type=code&scope=email%20profile&state=mock-state`);
+  },
+
+  openOAuthWindow: async (authUrl: string) => {
+    console.log('[API] Opening OAuth window:', authUrl);
+    // Mock successful OAuth response
+    const mockSession: AuthSession = {
+      access_token: 'mock-access-token',
+      refresh_token: 'mock-refresh-token',
+      expires_at: Date.now() + 3600000, // 1 hour from now
+      user: {
+        id: 'mock-user-id',
+        email: 'test@example.com',
+        name: 'Test User',
+        avatar_url: 'https://via.placeholder.com/40',
+        provider: 'google',
+      },
+    };
+    return Promise.resolve(mockSession);
+  },
+
+  clearSession: async () => {
+    console.log('[API] Clearing stored session');
+    return Promise.resolve();
+  },
+
+  getStoredSession: async () => {
+    console.log('[API] Getting stored session');
+    return Promise.resolve(null);
+  },
+
+  storeSession: async (session: AuthSession) => {
+    console.log('[API] Storing session:', session);
+    return Promise.resolve();
+  },
+
+  validateSession: async (session: AuthSession) => {
+    console.log('[API] Validating session:', session);
+    // Mock validation - check if token is not expired
+    return Promise.resolve(session.expires_at ? session.expires_at > Date.now() : true);
+  },
+
+  refreshAuthToken: async (refreshToken: string) => {
+    console.log('[API] Refreshing auth token:', refreshToken);
+    // Mock token refresh
+    const mockSession: AuthSession = {
+      access_token: 'new-mock-access-token',
+      refresh_token: refreshToken,
+      expires_at: Date.now() + 3600000,
+      user: {
+        id: 'mock-user-id',
+        email: 'test@example.com',
+        name: 'Test User',
+        avatar_url: 'https://via.placeholder.com/40',
+        provider: 'google',
+      },
+    };
+    return Promise.resolve(mockSession);
+  },
+
   startSession: async (goal: string) => {
     console.log('[API] Starting session with goal:', goal);
     return Promise.resolve({ id: `session-${Date.now()}`, goal });
@@ -130,8 +206,10 @@ const mockAPI: ElectronAPI = {
 };
 
 // Export the API interface
-// TODO: Replace mockAPI with window.api when IPC is implemented
-export const api = mockAPI;
+// Use window.api if available (in Electron), otherwise fallback to mockAPI
+const useRealAPI = typeof window !== 'undefined' && window.api;
+console.log('[API] Initializing API service. Using real API:', useRealAPI);
+export const api = useRealAPI ? window.api : mockAPI;
 
 // Helper to check if running in Electron
 export const isElectron = () => {

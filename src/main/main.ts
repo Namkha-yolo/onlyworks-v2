@@ -2,12 +2,15 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
 import { isDev } from './utils/env';
 import { createOverlayWindow, closeOverlayWindow } from './overlayWindow';
+import { AuthService } from './services/authService';
 
 class OnlyWorksApp {
   private mainWindow: BrowserWindow | null = null;
   private overlayWindow: BrowserWindow | null = null;
+  private authService: AuthService;
 
   constructor() {
+    this.authService = AuthService.getInstance();
     this.init();
   }
 
@@ -96,6 +99,70 @@ class OnlyWorksApp {
         }
         this.mainWindow.show();
         this.mainWindow.focus();
+      }
+    });
+
+    // Authentication handlers
+    ipcMain.handle('auth:init-oauth', async (event, provider: string) => {
+      try {
+        return await this.authService.initOAuth(provider);
+      } catch (error) {
+        console.error('Auth init error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('auth:open-oauth-window', async (event, authUrl: string) => {
+      try {
+        return await this.authService.openOAuthWindow(authUrl);
+      } catch (error) {
+        console.error('Auth window error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('auth:store-session', async (event, session: any) => {
+      try {
+        await this.authService.storeSession(session);
+      } catch (error) {
+        console.error('Store session error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('auth:get-stored-session', async () => {
+      try {
+        return await this.authService.getStoredSession();
+      } catch (error) {
+        console.error('Get stored session error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('auth:clear-session', async () => {
+      try {
+        await this.authService.clearSession();
+      } catch (error) {
+        console.error('Clear session error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('auth:validate-session', async (event, session: any) => {
+      try {
+        return await this.authService.validateSession(session);
+      } catch (error) {
+        console.error('Validate session error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('auth:refresh-token', async (event, refreshToken: string) => {
+      try {
+        return await this.authService.refreshAuthToken(refreshToken);
+      } catch (error) {
+        console.error('Refresh token error:', error);
+        throw error;
       }
     });
 

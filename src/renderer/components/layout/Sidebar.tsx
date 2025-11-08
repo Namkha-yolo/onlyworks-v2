@@ -1,5 +1,8 @@
 import React from 'react';
 import { useThemeStore } from '../../stores/themeStore';
+import { useAuthStore } from '../../stores/authStore';
+import UserProfile from '../auth/UserProfile';
+import LoginButton from '../auth/LoginButton';
 import logoDark from '../../assets/images/logo-dark.png';
 import logoLight from '../../assets/images/logo-light.png';
 
@@ -13,6 +16,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange, onOpenSettings }) => {
   const actualTheme = useThemeStore((state) => state.actualTheme);
+  const { isAuthenticated } = useAuthStore();
 
   const menuItems = [
     { id: 'dashboard', label: 'Overview', icon: '' },
@@ -48,8 +52,24 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange, onOpenSett
       </nav>
 
       <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
+        {/* Authentication Section */}
+        {isAuthenticated ? (
+          <UserProfile compact={true} className="mb-3" />
+        ) : (
+          <div className="mb-3">
+            <LoginButton
+              provider="google"
+              size="small"
+              variant="outline"
+              className="w-full text-xs"
+            />
+          </div>
+        )}
+
         <div className="text-xs text-gray-500 dark:text-gray-400">
-          Status: <span className="text-green-600 dark:text-green-400 font-medium">Ready</span>
+          Status: <span className={`font-medium ${isAuthenticated ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
+            {isAuthenticated ? 'Connected' : 'Not signed in'}
+          </span>
         </div>
 
         <button

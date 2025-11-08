@@ -8,5 +8,37 @@
 </head>
 <body>
     <div id="root"></div>
+    <script>
+        // Debug script to test window.api availability
+        console.log('=== Testing window.api availability ===');
+        console.log('window:', typeof window);
+        console.log('window.api:', typeof window.api);
+        console.log('window.electronAPI:', typeof window.electronAPI);
+
+        if (window.api) {
+            console.log('window.api methods:', Object.keys(window.api));
+            console.log('✅ window.api is available!');
+        } else {
+            console.log('❌ window.api is NOT available!');
+        }
+
+        if (window.electronAPI) {
+            console.log('window.electronAPI methods:', Object.keys(window.electronAPI));
+        }
+
+        // Test OAuth after React loads
+        setTimeout(() => {
+            console.log('Testing OAuth initialization...');
+            if (window.api && window.api.initOAuth) {
+                window.api.initOAuth('google').then(url => {
+                    console.log('✅ OAuth test successful! URL:', url);
+                }).catch(error => {
+                    console.log('❌ OAuth test failed:', error);
+                });
+            } else {
+                console.log('❌ window.api.initOAuth not available');
+            }
+        }, 2000);
+    </script>
 </body>
 </html>
