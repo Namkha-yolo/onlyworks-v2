@@ -110,9 +110,6 @@ const Dashboard: React.FC = () => {
             <button className="w-full btn-primary" onClick={handleStartSession}>
               Start New Session
             </button>
-            <button className="w-full btn-secondary" onClick={() => window.location.hash = '#analytics'}>
-              View Analytics
-            </button>
             <button className="w-full btn-secondary" onClick={() => console.log('Export data')}>
               Export Data
             </button>

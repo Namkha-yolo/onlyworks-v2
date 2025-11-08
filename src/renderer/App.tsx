@@ -5,12 +5,11 @@ import TopBar from './components/layout/TopBar';
 import Dashboard from './pages/Dashboard';
 import Workspace from './pages/Workspace';
 import Sessions from './pages/Sessions';
-import Analytics from './pages/Analytics';
 import Reports from './pages/Reports';
 import SettingsSidebar from './components/modals/SettingsSidebar';
 import { useThemeStore } from './stores/themeStore';
 
-type Page = 'dashboard' | 'workspace' | 'sessions' | 'analytics' | 'reports';
+type Page = 'dashboard' | 'workspace' | 'sessions' | 'reports';
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
@@ -29,8 +28,6 @@ const App: React.FC = () => {
         return <Workspace />;
       case 'sessions':
         return <Sessions />;
-      case 'analytics':
-        return <Analytics />;
       case 'reports':
         return <Reports />;
       default:

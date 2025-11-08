@@ -1,7 +1,18 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 import { useSessionStore } from '../stores/sessionStore';
 import { useTeamStore } from '../stores/teamStore';
+import { Goal } from '../components/goals/GoalsManager';
+import GoalsManager from '../components/goals/GoalsManager';
+import WeeklyChart from '../components/charts/WeeklyChart';
+import ActivityBreakdown from '../components/charts/ActivityBreakdown';
+import RecentActivityList from '../components/activity/RecentActivityList';
+import CreateTeamModal from '../components/teams/CreateTeamModal';
+import InviteMemberModal from '../components/teams/InviteMemberModal';
+import JoinTeamModal from '../components/teams/JoinTeamModal';
+import TeamDetailModal from '../components/teams/TeamDetailModal';
+import MemberProfileModal from '../components/teams/MemberProfileModal';
+import { calculateInsights } from '../utils/calculateInsights';
 
 const Workspace: React.FC = () => {
   const { activeTab, searchQuery, setActiveTab, setSearchQuery } = useWorkspaceStore();
@@ -66,11 +77,15 @@ const Workspace: React.FC = () => {
 
 // Personal Tab Component
 const PersonalTab: React.FC = () => {
-  const { activeSession, todayStats, getTodayStats, startSession } = useSessionStore();
+  const { activeSession, todayStats, recentSessions, getTodayStats, startSession, getRecentSessions } = useSessionStore();
+  const [goals, setGoals] = useState<Goal[]>([]);
 
   useEffect(() => {
     getTodayStats();
-  }, [getTodayStats]);
+    getRecentSessions();
+  }, [getTodayStats, getRecentSessions]);
+
+  const insights = calculateInsights(recentSessions, goals);
 
   const handleStartSession = () => {
     const goal = prompt('Enter your session goal:');
@@ -132,18 +147,72 @@ const PersonalTab: React.FC = () => {
 
       {/* Personal Goals */}
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Personal Goals</h3>
+        <GoalsManager onGoalsChange={setGoals} />
+      </div>
+
+      {/* Analytics */}
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Analytics</h3>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+            <h4 className="text-base font-semibold text-gray-900 dark:text-white mb-4">
+              Weekly Overview
+            </h4>
+            <WeeklyChart sessions={recentSessions} type="line" />
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+            <h4 className="text-base font-semibold text-gray-900 dark:text-white mb-4">
+              Activity Breakdown
+            </h4>
+            <ActivityBreakdown sessions={recentSessions} />
+          </div>
+        </div>
+      </div>
+
+      {/* Productivity Insights */}
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Productivity Insights</h3>
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-          <p className="text-sm text-gray-500 dark:text-gray-400 text-center">No active goals</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+              <p className="text-2xl font-bold text-green-600 dark:text-green-400">📈</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-white mt-2">
+                Peak Hours
+              </p>
+              <p className="text-xs text-gray-600 dark:text-gray-400">{insights.peakHours}</p>
+            </div>
+
+            <div className="text-center p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
+              <p className="text-2xl font-bold text-primary-600 dark:text-primary-400">⚡</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-white mt-2">
+                Focus Score
+              </p>
+              <p className="text-xs text-gray-600 dark:text-gray-400">
+                {insights.focusScoreWeekly > 0 ? `${insights.focusScoreWeekly}% this week` : 'No data'}
+              </p>
+            </div>
+
+            <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+              <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">🎯</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-white mt-2">
+                Goal Achievement
+              </p>
+              <p className="text-xs text-gray-600 dark:text-gray-400">
+                {insights.goalAchievement.total > 0
+                  ? `${insights.goalAchievement.completed}/${insights.goalAchievement.total} completed`
+                  : 'No goals set'
+                }
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Recent Activity */}
       <div>
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Activity</h3>
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-          <p className="text-sm text-gray-500 dark:text-gray-400 text-center">No recent activity</p>
-        </div>
+        <RecentActivityList sessions={recentSessions} limit={10} />
       </div>
     </div>
   );
@@ -155,115 +224,209 @@ interface TeamsTabProps {
 }
 
 const TeamsTab: React.FC<TeamsTabProps> = ({ searchQuery }) => {
-  const { teams, members, createTeam, inviteMember } = useTeamStore();
+  const { teams, members, createTeam, inviteMember, joinTeam, leaveTeam } = useTeamStore();
+  const [showCreateTeamModal, setShowCreateTeamModal] = useState(false);
+  const [showInviteMemberModal, setShowInviteMemberModal] = useState(false);
+  const [showJoinTeamModal, setShowJoinTeamModal] = useState(false);
+  const [selectedTeam, setSelectedTeam] = useState<any>(null);
+  const [selectedMember, setSelectedMember] = useState<any>(null);
 
-  const handleCreateTeam = () => {
-    const name = prompt('Enter team name:');
-    if (name) {
-      const description = prompt('Enter team description (optional):');
-      createTeam(name, description || undefined);
-    }
+  const handleCreateTeam = (name: string, description?: string) => {
+    createTeam(name, description);
   };
 
-  const handleJoinTeam = () => {
-    const teamId = prompt('Enter team ID or invite code:');
-    if (teamId) {
-      // TODO: Implement join team logic
-      console.log('Joining team:', teamId);
-    }
+  const handleJoinTeam = (inviteCode: string) => {
+    joinTeam(inviteCode);
   };
 
-  const handleInviteMember = () => {
-    const email = prompt('Enter member email:');
-    if (email && teams.length > 0) {
-      inviteMember(teams[0].id, email);
-    }
+  const handleInviteMember = (teamId: string, email: string) => {
+    inviteMember(teamId, email);
   };
+
+  const handleTeamClick = (team: any) => {
+    setSelectedTeam(team);
+  };
+
+  const handleMemberClick = (member: any) => {
+    setSelectedMember(member);
+  };
+
+  // Filter teams and members based on search query
+  const filteredTeams = teams.filter((team) =>
+    team.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    team.description?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredMembers = members.filter((member) =>
+    member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    member.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    member.role.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="space-y-8">
       {/* Teams Section */}
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Teams</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Create Team Card */}
-          <div
-            className="bg-gray-50 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 p-6 flex flex-col items-center justify-center hover:border-primary-500 dark:hover:border-primary-500 transition-colors cursor-pointer group"
-            onClick={handleCreateTeam}
-          >
-            <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center mb-3 group-hover:bg-primary-100 dark:group-hover:bg-primary-900 transition-colors">
-              <svg className="w-6 h-6 text-gray-600 dark:text-gray-400 group-hover:text-primary-600 dark:group-hover:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Teams</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Collaborate and track team productivity
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Primary action: Create */}
+            <button
+              onClick={() => setShowCreateTeamModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm hover:shadow-md"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-            </div>
-            <p className="text-sm font-medium text-gray-900 dark:text-white">Create Team</p>
-          </div>
+              Create Team
+            </button>
 
-          {/* Join Team Card */}
-          <div
-            className="bg-gray-50 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 p-6 flex flex-col items-center justify-center hover:border-primary-500 dark:hover:border-primary-500 transition-colors cursor-pointer group"
-            onClick={handleJoinTeam}
-          >
-            <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center mb-3 group-hover:bg-primary-100 dark:group-hover:bg-primary-900 transition-colors">
-              <svg className="w-6 h-6 text-gray-600 dark:text-gray-400 group-hover:text-primary-600 dark:group-hover:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-              </svg>
-            </div>
-            <p className="text-sm font-medium text-gray-900 dark:text-white">Join Team</p>
-          </div>
-
-          {/* Render existing teams */}
-          {teams.map((team) => (
-            <div
-              key={team.id}
-              className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 hover:border-primary-500 dark:hover:border-primary-500 transition-colors cursor-pointer"
+            {/* Secondary action: Join */}
+            <button
+              onClick={() => setShowJoinTeamModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 border-2 border-primary-600 text-primary-600 dark:text-primary-400 dark:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950 text-sm font-medium rounded-lg transition-colors"
             >
-              <h4 className="text-base font-semibold text-gray-900 dark:text-white mb-2">{team.name}</h4>
-              {team.description && (
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{team.description}</p>
-              )}
-              <p className="text-xs text-gray-500 dark:text-gray-400">{team.memberCount} members</p>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14" />
+              </svg>
+              Join Team
+            </button>
+          </div>
+        </div>
+
+        {/* Teams Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredTeams.length === 0 ? (
+            // Simple empty state
+            <div className="col-span-full bg-gray-50 dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-8 text-center">
+              <svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                No teams yet
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Create your first team or join an existing one to start tracking productivity
+              </p>
             </div>
-          ))}
+          ) : (
+            // Render existing teams
+            filteredTeams.map((team) => (
+              <div
+                key={team.id}
+                className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 hover:border-primary-500 dark:hover:border-primary-500 transition-colors cursor-pointer"
+                onClick={() => handleTeamClick(team)}
+              >
+                <h4 className="text-base font-semibold text-gray-900 dark:text-white mb-2">{team.name}</h4>
+                {team.description && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{team.description}</p>
+                )}
+                <p className="text-xs text-gray-500 dark:text-gray-400">{team.memberCount} members</p>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
       {/* Members Section */}
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Members</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Render existing members */}
-          {members.map((member) => (
-            <div key={member.id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex flex-col items-center">
-                <div className="w-16 h-16 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center mb-3">
-                  <span className="text-2xl font-medium text-primary-600 dark:text-primary-300">
-                    {member.avatar || member.name.charAt(0)}
-                  </span>
-                </div>
-                <h4 className="text-base font-semibold text-gray-900 dark:text-white mb-1">{member.name}</h4>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{member.role}</p>
-                <button className="px-4 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                  View
-                </button>
-              </div>
-            </div>
-          ))}
-
-          {/* Invite Member Card */}
-          <div
-            className="bg-gray-50 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 p-6 flex flex-col items-center justify-center hover:border-primary-500 dark:hover:border-primary-500 transition-colors cursor-pointer group"
-            onClick={handleInviteMember}
-          >
-            <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center mb-3 group-hover:bg-primary-100 dark:group-hover:bg-primary-900 transition-colors">
-              <svg className="w-6 h-6 text-gray-600 dark:text-gray-400 group-hover:text-primary-600 dark:group-hover:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-            </div>
-            <p className="text-sm font-medium text-gray-900 dark:text-white">Invite Member</p>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Members</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              View team members and their activity
+            </p>
           </div>
+
+          <button
+            onClick={() => setShowInviteMemberModal(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm hover:shadow-md"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Invite Member
+          </button>
+        </div>
+
+        {/* Members Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredMembers.length === 0 ? (
+            // Simple empty state
+            <div className="col-span-full bg-gray-50 dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-8 text-center">
+              <svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+              <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                No team members yet
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Invite team members to start collaborating
+              </p>
+            </div>
+          ) : (
+            // Render existing members
+            filteredMembers.map((member) => (
+              <div key={member.id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                <div className="flex flex-col items-center">
+                  <div className="w-16 h-16 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center mb-3">
+                    <span className="text-2xl font-medium text-primary-600 dark:text-primary-300">
+                      {member.avatar || member.name.charAt(0)}
+                    </span>
+                  </div>
+                  <h4 className="text-base font-semibold text-gray-900 dark:text-white mb-1">{member.name}</h4>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{member.role}</p>
+                  <button
+                    onClick={() => handleMemberClick(member)}
+                    className="px-4 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    View Profile
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
+
+      {/* Modals */}
+      <CreateTeamModal
+        isOpen={showCreateTeamModal}
+        onClose={() => setShowCreateTeamModal(false)}
+        onSubmit={handleCreateTeam}
+      />
+      <InviteMemberModal
+        isOpen={showInviteMemberModal}
+        onClose={() => setShowInviteMemberModal(false)}
+        onSubmit={handleInviteMember}
+        teams={teams.map((team) => ({ id: team.id, name: team.name }))}
+      />
+      <JoinTeamModal
+        isOpen={showJoinTeamModal}
+        onClose={() => setShowJoinTeamModal(false)}
+        onSubmit={handleJoinTeam}
+      />
+      <TeamDetailModal
+        isOpen={!!selectedTeam}
+        onClose={() => setSelectedTeam(null)}
+        team={selectedTeam}
+        onLeaveTeam={leaveTeam}
+        onInviteMember={() => {
+          setSelectedTeam(null);
+          setShowInviteMemberModal(true);
+        }}
+      />
+      <MemberProfileModal
+        isOpen={!!selectedMember}
+        onClose={() => setSelectedMember(null)}
+        member={selectedMember}
+      />
     </div>
   );
 };

@@ -3,7 +3,7 @@ import { useThemeStore } from '../../stores/themeStore';
 import logoDark from '../../assets/images/logo-dark.png';
 import logoLight from '../../assets/images/logo-light.png';
 
-type Page = 'dashboard' | 'workspace' | 'sessions' | 'analytics' | 'reports';
+type Page = 'dashboard' | 'workspace' | 'sessions' | 'reports';
 
 interface SidebarProps {
   currentPage: Page;
@@ -18,7 +18,6 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange, onOpenSett
     { id: 'dashboard', label: 'Overview', icon: '' },
     { id: 'workspace', label: 'Workspace', icon: '' },
     { id: 'sessions', label: 'Sessions', icon: '' },
-    { id: 'analytics', label: 'Analytics', icon: '' },
     { id: 'reports', label: 'Reports', icon: '' },
   ];
 
