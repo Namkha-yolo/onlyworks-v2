@@ -194,6 +194,7 @@ export class AuthService {
   private async handleOAuthCallback(url: string, authWindow: BrowserWindow, resolve: (value: AuthSession | null) => void): Promise<void> {
     try {
       console.log('[AuthService] Checking URL for OAuth callback:', url);
+      console.log('[AuthService] Expected callback pattern: localhost:8080/api/auth/oauth/google/callback');
 
       // Check if window has been destroyed
       if (authWindow.isDestroyed()) {
@@ -206,12 +207,18 @@ export class AuthService {
 
       // Look for the authorization code in the URL or fragment-based tokens
       const isCallback = (
+        urlObj.pathname.includes('/auth/oauth/google/callback') ||
         urlObj.pathname.includes('/auth/callback') ||
         urlObj.pathname.includes('/callback') ||
         urlObj.searchParams.has('code') ||
         urlObj.searchParams.has('access_token') ||
-        url.includes('#access_token=')
+        url.includes('#access_token=') ||
+        url.includes('localhost:8080/api/auth/oauth/google/callback')
       );
+
+      console.log('[AuthService] isCallback check result:', isCallback);
+      console.log('[AuthService] URL pathname:', urlObj.pathname);
+      console.log('[AuthService] URL search params:', urlObj.search);
 
       if (isCallback) {
         console.log('[AuthService] Detected OAuth callback:', url);
@@ -265,14 +272,14 @@ export class AuthService {
           console.log('[AuthService] Authorization code received, exchanging with server...');
 
           try {
-            const response = await fetch(`${this.serverUrl}/api/auth/callback`, {
+            const response = await fetch(`${this.serverUrl}/api/auth/oauth/google/callback`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
                 code,
-                provider: 'google'
+                state: urlObj.searchParams.get('state')
               }),
             });
 
@@ -294,15 +301,15 @@ export class AuthService {
             }
 
             const session: AuthSession = {
-              access_token: data.data.access_token,
-              refresh_token: data.data.refresh_token,
-              expires_at: data.data.expires_at,
+              access_token: data.data.token,
+              refresh_token: data.data.refresh_token || '',
+              expires_at: data.data.expiresIn ? Date.now() + (data.data.expiresIn * 1000) : Date.now() + 3600000,
               user: {
                 id: data.data.user.id,
                 email: data.data.user.email,
                 name: data.data.user.name || data.data.user.email,
-                avatar_url: data.data.user.avatar_url,
-                provider: data.data.user.provider || 'google'
+                avatar_url: data.data.user.avatar || data.data.user.avatar_url,
+                provider: 'google'
               }
             };
 

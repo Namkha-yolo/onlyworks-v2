@@ -188,7 +188,7 @@ const SecureApiDemo: React.FC = () => {
   const updateCredentials = async () => {
     try {
       // In a real app, you'd show a form for users to enter their API keys
-      const googleApiKey = prompt('Enter Google API Key (for Gemini):');
+      const googleApiKey = window.prompt('Enter Google API Key (for Gemini):');
       if (!googleApiKey) return;
 
       console.log('[SecureAPIDemo] Updating credentials...');
