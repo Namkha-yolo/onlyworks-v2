@@ -18,6 +18,7 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.7.1",
     "@typescript-eslint/eslint-plugin": "^8.46.0",
     "@typescript-eslint/parser": "^8.46.0",
@@ -41,16 +42,20 @@
     "webpack-dev-server": "^5.2.2"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@jitsi/robotjs": "^0.6.18",
     "@supabase/supabase-js": "^2.75.0",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.1",
     "@types/uuid": "^10.0.0",
+    "@vercel/node": "^5.5.5",
     "dotenv": "^17.2.3",
     "electron-store": "^11.0.2",
+    "jsonwebtoken": "^9.0.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "recharts": "^3.3.0",
+    "resend": "^6.4.2",
     "robotjs": "^0.6.0",
     "uiohook-napi": "^1.5.4",
     "uuid": "^13.0.0",

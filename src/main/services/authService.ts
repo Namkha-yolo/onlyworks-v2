@@ -25,8 +25,10 @@ export class AuthService {
   private serverUrl: string;
 
   constructor() {
-    // Use environment variable or fallback to localhost for development
-    this.serverUrl = process.env.ONLYWORKS_SERVER_URL || 'http://localhost:3001';
+    // Use Vercel deployment URL or fallback to localhost for development
+    this.serverUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.ONLYWORKS_SERVER_URL || 'http://localhost:3000';
   }
 
   static getInstance(): AuthService {
@@ -39,13 +41,24 @@ export class AuthService {
   async initOAuth(provider: string): Promise<string> {
     try {
       console.log('[AuthService] Initiating OAuth for provider:', provider);
-      console.log('[AuthService] Using mock OAuth for testing');
+      console.log('[AuthService] Server URL:', this.serverUrl);
 
-      // Mock OAuth URL for testing - this simulates what the server would return
-      const mockOAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=mock-client&redirect_uri=http%3A//localhost%3A3001/api/auth/callback&response_type=code&scope=email%20profile&access_type=offline&state=${provider}-${Date.now()}`;
+      const response = await fetch(`${this.serverUrl}/api/auth/oauth-init`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ provider }),
+      });
 
-      console.log('[AuthService] Mock OAuth URL generated:', mockOAuthUrl);
-      return mockOAuthUrl;
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to initialize OAuth');
+      }
+
+      const { authUrl } = await response.json();
+      console.log('[AuthService] OAuth URL received:', authUrl);
+      return authUrl;
     } catch (error) {
       console.error('OAuth initialization error:', error);
       throw error;
@@ -55,7 +68,6 @@ export class AuthService {
   async openOAuthWindow(authUrl: string): Promise<AuthSession | null> {
     return new Promise((resolve, reject) => {
       console.log('[AuthService] Opening OAuth window for URL:', authUrl);
-      console.log('[AuthService] Simulating OAuth flow with mock data...');
 
       const authWindow = new BrowserWindow({
         width: 500,
@@ -75,41 +87,70 @@ export class AuthService {
       // Load the OAuth URL (this will show the actual Google login page)
       authWindow.loadURL(authUrl);
 
-      // For testing purposes, simulate a successful OAuth after 3 seconds
-      // In production, this would wait for the actual callback
-      setTimeout(() => {
-        console.log('[AuthService] Simulating successful OAuth callback...');
+      let callbackHandled = false;
 
-        // Create a mock session as if we received it from OAuth
-        const session: AuthSession = {
-          access_token: `mock_token_${Date.now()}`,
-          refresh_token: `mock_refresh_${Date.now()}`,
-          expires_at: Date.now() + 3600000, // 1 hour from now
-          user: {
-            id: 'mock-user-123',
-            email: 'testuser@onlyworks.dev',
-            name: 'Test User',
-            avatar_url: 'https://via.placeholder.com/40?text=TU',
-            provider: 'google',
-          },
-        };
+      // Listen for navigation to callback URL
+      authWindow.webContents.on('will-redirect', async (event, url) => {
+        console.log('[AuthService] Redirect detected:', url);
+        if (url.includes('/api/auth/callback') && !callbackHandled) {
+          callbackHandled = true;
+          event.preventDefault();
 
-        console.log('[AuthService] Mock session created:', session);
+          // Extract code and state from URL
+          const urlParams = new URL(url);
+          const code = urlParams.searchParams.get('code');
+          const state = urlParams.searchParams.get('state');
 
-        // Store session
-        this.storeSession(session);
+          if (!code) {
+            console.error('[AuthService] No code in callback URL');
+            authWindow.close();
+            resolve(null);
+            return;
+          }
 
-        // Close auth window
-        authWindow.close();
+          try {
+            // Exchange code for session
+            const response = await net.fetch(`${this.serverUrl}/api/auth/oauth-callback`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ code, state }),
+            });
 
-        // Resolve with the session
-        resolve(session);
-      }, 3000);
+            if (!response.ok) {
+              const error = await response.json();
+              console.error('[AuthService] OAuth callback error:', error);
+              authWindow.close();
+              resolve(null);
+              return;
+            }
+
+            const session: AuthSession = await response.json();
+            console.log('[AuthService] Session received:', session);
+
+            // Store session
+            await this.storeSession(session);
+
+            // Close auth window
+            authWindow.close();
+
+            // Resolve with the session
+            resolve(session);
+          } catch (error) {
+            console.error('[AuthService] Failed to exchange code for session:', error);
+            authWindow.close();
+            resolve(null);
+          }
+        }
+      });
 
       // Handle window closed manually (user cancellation)
       authWindow.on('closed', () => {
-        console.log('[AuthService] OAuth window closed');
-        resolve(null);
+        if (!callbackHandled) {
+          console.log('[AuthService] OAuth window closed by user');
+          resolve(null);
+        }
       });
 
       // Handle external link opening
@@ -155,9 +196,21 @@ export class AuthService {
         return false;
       }
 
-      // TODO: Validate with server if needed
-      // For now, just check if token exists and is not expired
-      return Boolean(session.access_token);
+      // Validate with server
+      const response = await net.fetch(`${this.serverUrl}/api/auth/validate-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ access_token: session.access_token }),
+      });
+
+      if (!response.ok) {
+        return false;
+      }
+
+      const { valid } = await response.json();
+      return valid;
     } catch (error) {
       console.error('Session validation error:', error);
       return false;
@@ -166,13 +219,28 @@ export class AuthService {
 
   async refreshAuthToken(refreshToken: string): Promise<AuthSession | null> {
     try {
-      // TODO: Implement token refresh with the server
-      // For now, return null to force re-authentication
-      console.log('Token refresh not yet implemented, user will need to re-authenticate');
-      return null;
+      const response = await net.fetch(`${this.serverUrl}/api/auth/refresh-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+
+      if (!response.ok) {
+        console.log('Token refresh failed, user will need to re-authenticate');
+        return null;
+      }
+
+      const session: AuthSession = await response.json();
+
+      // Store the new session
+      await this.storeSession(session);
+
+      return session;
     } catch (error) {
       console.error('Token refresh error:', error);
-      throw error;
+      return null;
     }
   }
 }
