@@ -49,22 +49,27 @@ export const useTeamStore = create<TeamState>((set, get) => ({
     set({ loading: true });
 
     try {
-      // Note: Team functionality isn't implemented in backend yet
-      // Using mock data for now, but structured to be easily replaceable
-      const newTeam: Team = {
-        id: `team-${Date.now()}`,
-        name,
-        description,
-        memberCount: 1,
-        members: [],
-        createdAt: new Date(),
-        isActive: true,
-      };
+      const response = await backendApi.createTeam({ name, description });
 
-      set((state) => ({
-        teams: [...state.teams, newTeam],
-        loading: false,
-      }));
+      if (response.success && response.data) {
+        const newTeam: Team = {
+          id: response.data.id,
+          name: response.data.name,
+          description: response.data.description,
+          memberCount: response.data.memberCount || 1,
+          members: [],
+          createdAt: new Date(response.data.createdAt),
+          isActive: true,
+        };
+
+        set((state) => ({
+          teams: [...state.teams, newTeam],
+          loading: false,
+        }));
+      } else {
+        console.error('Failed to create team:', response.error || 'Unknown error');
+        set({ loading: false });
+      }
     } catch (error) {
       console.error('Error creating team:', error);
       set({ loading: false });
@@ -74,69 +79,125 @@ export const useTeamStore = create<TeamState>((set, get) => ({
   joinTeam: async (teamId: string) => {
     set({ loading: true });
 
-    // TODO: Call IPC to main process
-    // await window.api.joinTeam(teamId);
+    try {
+      const response = await backendApi.joinTeam(teamId);
 
-    // Mock join
-    set((state) => ({
-      teams: state.teams.map((team) =>
-        team.id === teamId
-          ? { ...team, memberCount: team.memberCount + 1 }
-          : team
-      ),
-      loading: false,
-    }));
+      if (response.success) {
+        set((state) => ({
+          teams: state.teams.map((team) =>
+            team.id === teamId
+              ? { ...team, memberCount: team.memberCount + 1 }
+              : team
+          ),
+          loading: false,
+        }));
+      } else {
+        console.error('Failed to join team:', response.error || 'Unknown error');
+        set({ loading: false });
+      }
+    } catch (error) {
+      console.error('Error joining team:', error);
+      set({ loading: false });
+    }
   },
 
   leaveTeam: async (teamId: string) => {
     set({ loading: true });
 
-    // TODO: Call IPC to main process
-    // await window.api.leaveTeam(teamId);
+    try {
+      const response = await backendApi.leaveTeam(teamId);
 
-    set((state) => ({
-      teams: state.teams.filter((team) => team.id !== teamId),
-      loading: false,
-    }));
+      if (response.success) {
+        set((state) => ({
+          teams: state.teams.filter((team) => team.id !== teamId),
+          loading: false,
+        }));
+      } else {
+        console.error('Failed to leave team:', response.error || 'Unknown error');
+        set({ loading: false });
+      }
+    } catch (error) {
+      console.error('Error leaving team:', error);
+      set({ loading: false });
+    }
   },
 
   inviteMember: async (teamId: string, email: string) => {
     set({ loading: true });
 
-    // TODO: Call IPC to main process
-    // await window.api.inviteMember(teamId, email);
-
-    // Mock invite
-    set({ loading: false });
+    try {
+      // Since there's no specific invite API method in the backend API yet,
+      // we'll just log this for now and set loading to false
+      console.log('Invite member functionality not yet implemented in backend API:', { teamId, email });
+      set({ loading: false });
+    } catch (error) {
+      console.error('Error inviting member:', error);
+      set({ loading: false });
+    }
   },
 
   removeMember: async (teamId: string, memberId: string) => {
     set({ loading: true });
 
-    // TODO: Call IPC to main process
-    // await window.api.removeMember(teamId, memberId);
+    try {
+      const response = await backendApi.removeMember(teamId, memberId);
 
-    set((state) => ({
-      teams: state.teams.map((team) =>
-        team.id === teamId
-          ? {
-              ...team,
-              members: team.members.filter((m) => m.id !== memberId),
-              memberCount: team.memberCount - 1,
-            }
-          : team
-      ),
-      loading: false,
-    }));
+      if (response.success) {
+        set((state) => ({
+          teams: state.teams.map((team) =>
+            team.id === teamId
+              ? {
+                  ...team,
+                  members: team.members.filter((m) => m.id !== memberId),
+                  memberCount: team.memberCount - 1,
+                }
+              : team
+          ),
+          loading: false,
+        }));
+      } else {
+        console.error('Failed to remove member:', response.error || 'Unknown error');
+        set({ loading: false });
+      }
+    } catch (error) {
+      console.error('Error removing member:', error);
+      set({ loading: false });
+    }
   },
 
   getTeams: async () => {
     set({ loading: true });
 
     try {
-      // Note: Team functionality isn't implemented in backend yet
-      // Using empty array for now, but structured to be easily replaceable
-      const teams: Team[] = [];
+      const response = await backendApi.getTeams();
+
+      // Handle different response formats
+      let teamsData: any[] = [];
+
+      if (response && response.success && response.data) {
+        // Standard API response format: {success: true, data: [...]}
+        teamsData = Array.isArray(response.data) ? response.data : [];
+      } else if (Array.isArray(response)) {
+        // Direct array response
+        teamsData = response;
+      } else if (response && response.success && !response.data) {
+        // Success but no data property
+        teamsData = [];
+      } else {
+        console.warn('Failed to fetch teams from backend. Response:', response);
+        set({ teams: [], loading: false });
+        return;
+      }
+
+      const teams: Team[] = teamsData.map((team: any) => ({
+        id: team.id,
+        name: team.name,
+        description: team.description,
+        memberCount: team.memberCount || 0,
+        members: team.members || [],
+        createdAt: new Date(team.createdAt || team.created_at),
+        isActive: team.isActive !== undefined ? team.isActive : true,
+      }));
 
       set({ teams, loading: false });
     } catch (error) {
@@ -152,7 +213,7 @@ export const useTeamStore = create<TeamState>((set, get) => ({
       // Try to get user profile to populate current user
       const userResponse = await backendApi.getUserProfile();
 
-      let currentUser: TeamMember;
+      let currentUser: TeamMember | null;
 
       if (userResponse.success && userResponse.data) {
         currentUser = {
@@ -164,37 +225,20 @@ export const useTeamStore = create<TeamState>((set, get) => ({
           avatar: userResponse.data.avatar_url || userResponse.data.display_name?.charAt(0) || 'Y',
         };
       } else {
-        // Fallback to mock user if profile fetch fails
-        currentUser = {
-          id: 'user-1',
-          name: 'You',
-          email: 'you@example.com',
-          role: 'Member',
-          status: 'online',
-          avatar: 'Y',
-        };
+        console.warn('Failed to fetch user profile from backend');
+        currentUser = null;
       }
 
       set({
-        members: [currentUser],
+        members: currentUser ? [currentUser] : [],
         currentUser,
         loading: false,
       });
     } catch (error) {
       console.error('Error fetching members:', error);
-      // Fallback to mock user on error
-      const currentUser: TeamMember = {
-        id: 'user-1',
-        name: 'You',
-        email: 'you@example.com',
-        role: 'Member',
-        status: 'online',
-        avatar: 'Y',
-      };
-
       set({
-        members: [currentUser],
-        currentUser,
+        members: [],
+        currentUser: null,
         loading: false,
       });
     }

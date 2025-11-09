@@ -326,6 +326,135 @@ class OnlyWorksApp {
       }
     });
 
+    // Team management handlers
+    ipcMain.handle('api:create-team', async (event, teamData: { name: string; description?: string }) => {
+      try {
+        return await this.backendApi.post('/teams', teamData);
+      } catch (error) {
+        console.error('Create team error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('api:join-team', async (event, teamId: string) => {
+      try {
+        return await this.backendApi.post(`/teams/${teamId}/join`);
+      } catch (error) {
+        console.error('Join team error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('api:leave-team', async (event, teamId: string) => {
+      try {
+        return await this.backendApi.post(`/teams/${teamId}/leave`);
+      } catch (error) {
+        console.error('Leave team error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('api:get-teams', async () => {
+      try {
+        return await this.backendApi.get('/teams');
+      } catch (error) {
+        console.error('Get teams error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('api:get-members', async () => {
+      try {
+        return await this.backendApi.get('/teams/members');
+      } catch (error) {
+        console.error('Get members error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('api:invite-member', async (event, teamId: string, email: string) => {
+      try {
+        return await this.backendApi.post(`/teams/${teamId}/invite`, { email });
+      } catch (error) {
+        console.error('Invite member error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('api:remove-member', async (event, teamId: string, memberId: string) => {
+      try {
+        return await this.backendApi.delete(`/teams/${teamId}/members/${memberId}`);
+      } catch (error) {
+        console.error('Remove member error:', error);
+        throw error;
+      }
+    });
+
+    // Settings handlers
+    ipcMain.handle('api:save-settings', async (event, settings: any) => {
+      try {
+        return await this.backendApi.post('/users/settings', settings);
+      } catch (error) {
+        console.error('Save settings error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('api:load-settings', async () => {
+      try {
+        return await this.backendApi.get('/users/settings');
+      } catch (error) {
+        console.error('Load settings error:', error);
+        throw error;
+      }
+    });
+
+    // Analytics and reporting handlers
+    ipcMain.handle('api:get-analytics', async (event, timeRange: string) => {
+      try {
+        return await this.backendApi.get(`/analytics?timeRange=${timeRange}`);
+      } catch (error) {
+        console.error('Get analytics error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('api:export-data', async (event, format: string) => {
+      try {
+        return await this.backendApi.get(`/export/data?format=${format}`);
+      } catch (error) {
+        console.error('Export data error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('api:export-report', async (event, timeRange: string, format: string) => {
+      try {
+        return await this.backendApi.get(`/export/report?timeRange=${timeRange}&format=${format}`);
+      } catch (error) {
+        console.error('Export report error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('api:generate-individual-report', async (event, timeRange: string) => {
+      try {
+        return await this.backendApi.post('/reports/individual', { timeRange });
+      } catch (error) {
+        console.error('Generate individual report error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('api:generate-activity-summary-report', async (event, timeRange: string) => {
+      try {
+        return await this.backendApi.post('/reports/activity-summary', { timeRange });
+      } catch (error) {
+        console.error('Generate activity summary report error:', error);
+        throw error;
+      }
+    });
+
     // Secure API Proxy handlers
     ipcMain.handle('secure-api:call', async (event, request: any) => {
       try {

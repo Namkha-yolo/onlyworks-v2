@@ -19,30 +19,8 @@ const Analytics: React.FC = () => {
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             Activity Breakdown
           </h3>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Coding</span>
-              <span className="text-sm font-medium dark:text-gray-300">45%</span>
-            </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div className="bg-primary-600 dark:bg-primary-500 h-2 rounded-full" style={{ width: '45%' }}></div>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Research</span>
-              <span className="text-sm font-medium dark:text-gray-300">30%</span>
-            </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div className="bg-green-500 dark:bg-green-600 h-2 rounded-full" style={{ width: '30%' }}></div>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Communication</span>
-              <span className="text-sm font-medium dark:text-gray-300">25%</span>
-            </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div className="bg-yellow-500 dark:bg-yellow-600 h-2 rounded-full" style={{ width: '25%' }}></div>
-            </div>
+          <div className="flex items-center justify-center h-32">
+            <p className="text-gray-500 dark:text-gray-400">No activity data available</p>
           </div>
         </div>
       </div>
@@ -65,7 +43,7 @@ const Analytics: React.FC = () => {
             <p className="text-sm font-medium text-gray-900 dark:text-white mt-2">
               Focus Score
             </p>
-            <p className="text-xs text-gray-600 dark:text-gray-400">85% this week</p>
+            <p className="text-xs text-gray-600 dark:text-gray-400">No data</p>
           </div>
 
           <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">

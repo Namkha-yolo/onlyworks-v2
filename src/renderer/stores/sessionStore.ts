@@ -166,13 +166,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     try {
       const response = await backendApi.getUserSessions({ limit: 10 });
 
-      if (response.success && response.data && response.data.length > 0) {
-        const sessions: Session[] = response.data.map((session: any) => ({
+      if (response.success && response.data && response.data.sessions && response.data.sessions.length > 0) {
+        const sessions: Session[] = response.data.sessions.map((session: any) => ({
           id: session.id,
           goal: session.goal_description || session.session_name || 'Work Session',
-          startTime: new Date(session.started_at),
-          endTime: session.ended_at ? new Date(session.ended_at) : undefined,
-          duration: session.duration_seconds || 0,
+          startTime: new Date(session.start_time),
+          endTime: session.end_time ? new Date(session.end_time) : undefined,
+          duration: session.duration_minutes ? session.duration_minutes * 60 : 0,
           status: session.status === 'active' ? 'active' : session.status === 'paused' ? 'paused' : 'completed',
           productivityScore: session.productivity_score,
           focusScore: session.focus_score,
@@ -180,68 +180,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
         set({ recentSessions: sessions });
       } else {
-        console.warn('Failed to fetch recent sessions, using mock data for development');
-        // Generate realistic mock sessions
-        const mockSessions: Session[] = [
-          {
-            id: 'mock-session-1',
-            goal: 'Implement authentication system',
-            startTime: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-            endTime: new Date(Date.now() - 45 * 60 * 1000), // 45 mins ago
-            duration: 4500, // 75 minutes
-            status: 'completed',
-            focusScore: 85,
-            productivityScore: 92
-          },
-          {
-            id: 'mock-session-2',
-            goal: 'Research new technologies',
-            startTime: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
-            endTime: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3 hours ago
-            duration: 3600, // 60 minutes
-            status: 'completed',
-            focusScore: 72,
-            productivityScore: 68
-          },
-          {
-            id: 'mock-session-3',
-            goal: 'Team standup and planning',
-            startTime: new Date(Date.now() - 6 * 60 * 60 * 1000), // 6 hours ago
-            endTime: new Date(Date.now() - 5.5 * 60 * 60 * 1000), // 5.5 hours ago
-            duration: 1800, // 30 minutes
-            status: 'completed',
-            focusScore: 65,
-            productivityScore: 75
-          }
-        ];
-        set({ recentSessions: mockSessions });
+        console.warn('Failed to fetch recent sessions from backend');
+        set({ recentSessions: [] });
       }
     } catch (error) {
       console.error('Error getting recent sessions:', error);
-      // Generate realistic mock sessions for error case too
-      const mockSessions: Session[] = [
-        {
-          id: 'mock-session-1',
-          goal: 'Implement authentication system',
-          startTime: new Date(Date.now() - 2 * 60 * 60 * 1000),
-          endTime: new Date(Date.now() - 45 * 60 * 1000),
-          duration: 4500,
-          status: 'completed',
-          focusScore: 85,
-          productivityScore: 92
-        },
-        {
-          id: 'mock-session-2',
-          goal: 'Research new technologies',
-          startTime: new Date(Date.now() - 4 * 60 * 60 * 1000),
-          endTime: new Date(Date.now() - 3 * 60 * 60 * 1000),
-          duration: 3600,
-          status: 'completed',
-          focusScore: 72,
-          productivityScore: 68
-        }
-      ];
-      set({ recentSessions: mockSessions });
+      set({ recentSessions: [] });
     }
   },
 
@@ -253,30 +197,28 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       if (response.success && response.data) {
         set({
           todayStats: {
-            hours: response.data.totalDurationSeconds ? response.data.totalDurationSeconds / 3600 : 0,
-            sessions: response.data.totalSessions || 0,
-            focusScore: response.data.averageFocusScore || 0,
+            hours: response.data.total_time_minutes ? response.data.total_time_minutes / 60 : 0,
+            sessions: response.data.total_sessions || 0,
+            focusScore: response.data.average_focus || 0,
           },
         });
       } else {
-        console.warn('Failed to fetch today stats, using mock data for development');
-        // Provide realistic mock data for development
+        console.warn('Failed to fetch today stats from backend');
         set({
           todayStats: {
-            hours: 3.2,
-            sessions: 4,
-            focusScore: 78,
+            hours: 0,
+            sessions: 0,
+            focusScore: 0,
           },
         });
       }
     } catch (error) {
-      console.error('Error getting today stats, using mock data:', error);
-      // Provide realistic mock data for development
+      console.error('Error getting today stats:', error);
       set({
         todayStats: {
-          hours: 3.2,
-          sessions: 4,
-          focusScore: 78,
+          hours: 0,
+          sessions: 0,
+          focusScore: 0,
         },
       });
     }

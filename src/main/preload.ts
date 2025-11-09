@@ -52,18 +52,20 @@ contextBridge.exposeInMainWorld('api', {
   stopSession: (sessionId: string) => ipcRenderer.invoke('api:end-session', sessionId),
   getRecentSessions: () => ipcRenderer.invoke('api:get-user-sessions'),
   getTodayStats: () => ipcRenderer.invoke('api:get-session-stats'),
-  createTeam: (name: string, description?: string) => Promise.resolve({ id: `team-${Date.now()}`, name, description }),
-  joinTeam: (teamId: string) => Promise.resolve(),
-  leaveTeam: (teamId: string) => Promise.resolve(),
-  inviteMember: (teamId: string, email: string) => Promise.resolve(),
-  removeMember: (teamId: string, memberId: string) => Promise.resolve(),
-  getTeams: () => Promise.resolve([]),
-  getMembers: () => Promise.resolve([]),
-  saveSettings: (settings: any) => Promise.resolve(),
-  loadSettings: () => Promise.resolve({}),
-  getAnalytics: (timeRange: string) => Promise.resolve({}),
-  exportData: (format: string) => Promise.resolve(),
-  exportReport: (timeRange: string, format: string) => Promise.resolve(),
+  createTeam: (name: string, description?: string) => ipcRenderer.invoke('api:create-team', { name, description }),
+  joinTeam: (teamId: string) => ipcRenderer.invoke('api:join-team', teamId),
+  leaveTeam: (teamId: string) => ipcRenderer.invoke('api:leave-team', teamId),
+  inviteMember: (teamId: string, email: string) => ipcRenderer.invoke('api:invite-member', teamId, email),
+  removeMember: (teamId: string, memberId: string) => ipcRenderer.invoke('api:remove-member', teamId, memberId),
+  getTeams: () => ipcRenderer.invoke('api:get-teams'),
+  getMembers: () => ipcRenderer.invoke('api:get-members'),
+  saveSettings: (settings: any) => ipcRenderer.invoke('api:save-settings', settings),
+  loadSettings: () => ipcRenderer.invoke('api:load-settings'),
+  getAnalytics: (timeRange: string) => ipcRenderer.invoke('api:get-analytics', timeRange),
+  exportData: (format: string) => ipcRenderer.invoke('api:export-data', format),
+  exportReport: (timeRange: string, format: string) => ipcRenderer.invoke('api:export-report', timeRange, format),
+  generateIndividualReport: (timeRange: string) => ipcRenderer.invoke('api:generate-individual-report', timeRange),
+  generateActivitySummaryReport: (timeRange: string) => ipcRenderer.invoke('api:generate-activity-summary-report', timeRange),
 
   // Secure API methods - no credentials exposed to renderer
   secureApiCall: (request: any) => ipcRenderer.invoke('secure-api:call', request),
@@ -131,6 +133,8 @@ declare global {
       getAnalytics: (timeRange: string) => Promise<any>;
       exportData: (format: string) => Promise<void>;
       exportReport: (timeRange: string, format: string) => Promise<void>;
+      generateIndividualReport: (timeRange: string) => Promise<any>;
+      generateActivitySummaryReport: (timeRange: string) => Promise<any>;
 
       // Secure API methods
       secureApiCall: (request: any) => Promise<any>;

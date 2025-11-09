@@ -1,6 +1,13 @@
 import { Session } from '../stores/sessionStore';
 import { Goal } from '../components/goals/GoalsManager';
 
+export interface ProductivityRecommendation {
+  type: 'focus' | 'session' | 'goal';
+  title: string;
+  message: string;
+  color: string;
+}
+
 export interface ProductivityInsights {
   peakHours: string;
   focusScoreWeekly: number;
@@ -8,6 +15,7 @@ export interface ProductivityInsights {
     completed: number;
     total: number;
   };
+  recommendations: ProductivityRecommendation[];
 }
 
 export const calculateInsights = (
@@ -23,10 +31,14 @@ export const calculateInsights = (
   // Calculate goal achievement
   const goalAchievement = calculateGoalAchievement(goals);
 
+  // Generate dynamic recommendations
+  const recommendations = generateRecommendations(sessions, peakHours, focusScoreWeekly, goalAchievement);
+
   return {
     peakHours,
     focusScoreWeekly,
     goalAchievement,
+    recommendations,
   };
 };
 
@@ -95,4 +107,86 @@ const calculateGoalAchievement = (goals: Goal[]): { completed: number; total: nu
     completed,
     total: goals.length,
   };
+};
+
+const generateRecommendations = (
+  sessions: Session[],
+  peakHours: string,
+  focusScoreWeekly: number,
+  goalAchievement: { completed: number; total: number }
+): ProductivityRecommendation[] => {
+  const recommendations: ProductivityRecommendation[] = [];
+
+  // Focus optimization recommendation
+  if (peakHours !== '--') {
+    const focusMessage = focusScoreWeekly > 0
+      ? `Your focus score is highest during ${peakHours} (weekly average: ${focusScoreWeekly}%). Consider scheduling important tasks during this time window.`
+      : `Your focus score is highest during ${peakHours}. Consider scheduling important tasks during this time window.`;
+
+    recommendations.push({
+      type: 'focus',
+      title: 'Focus Optimization',
+      message: focusMessage,
+      color: 'bg-blue-50 dark:bg-blue-900/20 border-blue-400',
+    });
+  }
+
+  // Session length recommendation based on actual session data
+  if (sessions.length > 0) {
+    const avgSessionLength = sessions.reduce((sum, session) => sum + session.duration, 0) / sessions.length;
+    const avgMinutes = Math.round(avgSessionLength / 60);
+
+    let sessionMessage: string;
+    if (avgMinutes < 30) {
+      sessionMessage = `Your average session is ${avgMinutes} minutes. Try extending to 45-60 minutes for deeper focus.`;
+    } else if (avgMinutes > 90) {
+      sessionMessage = `Your sessions average ${avgMinutes} minutes. Consider shorter 45-60 minute sessions with breaks to maintain focus.`;
+    } else {
+      sessionMessage = `Your ${avgMinutes}-minute sessions are well-balanced. Consider adding 10-15 minute breaks between sessions.`;
+    }
+
+    recommendations.push({
+      type: 'session',
+      title: 'Session Length',
+      message: sessionMessage,
+      color: 'bg-amber-50 dark:bg-amber-900/20 border-amber-400',
+    });
+  }
+
+  // Goal-based recommendation
+  if (goalAchievement.total > 0) {
+    const completionRate = (goalAchievement.completed / goalAchievement.total) * 100;
+    let goalMessage: string;
+    let goalColor: string;
+
+    if (completionRate >= 80) {
+      goalMessage = `Excellent progress! You've completed ${goalAchievement.completed} of ${goalAchievement.total} goals. Consider setting more challenging targets.`;
+      goalColor = 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-400';
+    } else if (completionRate >= 50) {
+      goalMessage = `Good progress on goals (${goalAchievement.completed}/${goalAchievement.total} completed). Focus on completing the remaining ones.`;
+      goalColor = 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-400';
+    } else {
+      goalMessage = `${goalAchievement.completed} of ${goalAchievement.total} goals completed. Break down remaining goals into smaller, actionable steps.`;
+      goalColor = 'bg-red-50 dark:bg-red-900/20 border-red-400';
+    }
+
+    recommendations.push({
+      type: 'goal',
+      title: 'Goal Progress',
+      message: goalMessage,
+      color: goalColor,
+    });
+  }
+
+  // If no specific data, provide general productivity tip
+  if (recommendations.length === 0) {
+    recommendations.push({
+      type: 'session',
+      title: 'Getting Started',
+      message: 'Start tracking your sessions to receive personalized productivity recommendations.',
+      color: 'bg-gray-50 dark:bg-gray-700 border-gray-300',
+    });
+  }
+
+  return recommendations;
 };

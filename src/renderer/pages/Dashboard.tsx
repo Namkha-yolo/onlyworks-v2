@@ -3,12 +3,13 @@ import { useSessionStore } from '../stores/sessionStore';
 import InputDialog from '../components/common/InputDialog';
 
 const Dashboard: React.FC = () => {
-  const { todayStats, getTodayStats, startSession } = useSessionStore();
+  const { todayStats, recentSessions, getTodayStats, getRecentSessions, startSession } = useSessionStore();
   const [showSessionDialog, setShowSessionDialog] = useState(false);
 
   useEffect(() => {
     getTodayStats();
-  }, [getTodayStats]);
+    getRecentSessions();
+  }, [getTodayStats, getRecentSessions]);
 
   const handleStartSession = () => {
     setShowSessionDialog(true);
@@ -37,10 +38,10 @@ const Dashboard: React.FC = () => {
 
         <div className="card">
           <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
-            Screenshots Captured
+            Total Sessions
           </h3>
           <p className="text-3xl font-bold text-gray-900 dark:text-white">
-            {todayStats.sessions > 0 ? todayStats.sessions * 15 + Math.floor(Math.random() * 20) : 0}
+            {recentSessions.length}
           </p>
         </div>
 
@@ -69,41 +70,47 @@ const Dashboard: React.FC = () => {
             Recent Activity
           </h3>
           <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <div>
-                <p className="text-sm font-medium text-gray-900 dark:text-white">
-                  Coding Session
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">VS Code - 45 minutes</p>
-              </div>
-              <span className="text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-2 py-1 rounded">
-                High Focus
-              </span>
-            </div>
+            {recentSessions.length > 0 ? (
+              recentSessions.slice(0, 3).map((session) => {
+                const duration = Math.floor(session.duration / 60); // Convert to minutes
+                const focusScore = session.focusScore || 0;
 
-            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <div>
-                <p className="text-sm font-medium text-gray-900 dark:text-white">
-                  Research
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Browser - 30 minutes</p>
-              </div>
-              <span className="text-xs bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 px-2 py-1 rounded">
-                Medium Focus
-              </span>
-            </div>
+                let focusLevel = 'Unknown';
+                let focusClass = 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200';
 
-            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <div>
-                <p className="text-sm font-medium text-gray-900 dark:text-white">
-                  Communication
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Slack - 15 minutes</p>
+                if (focusScore >= 80) {
+                  focusLevel = 'High Focus';
+                  focusClass = 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200';
+                } else if (focusScore >= 60) {
+                  focusLevel = 'Medium Focus';
+                  focusClass = 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200';
+                } else if (focusScore > 0) {
+                  focusLevel = 'Low Focus';
+                  focusClass = 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200';
+                }
+
+                return (
+                  <div key={session.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {session.goal}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {duration > 0 ? `${duration} minutes` : 'Just started'} • {new Date(session.startTime).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded ${focusClass}`}>
+                      {focusLevel}
+                    </span>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center py-6">
+                <p className="text-sm text-gray-500 dark:text-gray-400">No recent sessions</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Start your first session to see activity here</p>
               </div>
-              <span className="text-xs bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200 px-2 py-1 rounded">
-                Collaboration
-              </span>
-            </div>
+            )}
           </div>
         </div>
 
@@ -117,27 +124,48 @@ const Dashboard: React.FC = () => {
             </button>
             <button
               className="w-full btn-secondary"
-              onClick={() => {
-                // Mock export functionality for now
-                const data = {
-                  sessions: todayStats.sessions,
-                  hours: todayStats.hours,
-                  focusScore: todayStats.focusScore,
-                  exportedAt: new Date().toISOString()
-                };
+              onClick={async () => {
+                try {
+                  // Gather comprehensive data from backend
+                  const exportData = {
+                    exportedAt: new Date().toISOString(),
+                    todayStats: {
+                      sessions: todayStats.sessions,
+                      hours: todayStats.hours,
+                      focusScore: todayStats.focusScore
+                    },
+                    recentSessions: recentSessions.map(session => ({
+                      id: session.id,
+                      goal: session.goal,
+                      startTime: session.startTime,
+                      endTime: session.endTime,
+                      duration: session.duration,
+                      status: session.status,
+                      focusScore: session.focusScore,
+                      productivityScore: session.productivityScore
+                    })),
+                    metadata: {
+                      exportFormat: 'OnlyWorks Data Export v1.0',
+                      totalSessionsIncluded: recentSessions.length
+                    }
+                  };
 
-                // Create a blob and download
-                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `onlyworks-data-${new Date().toISOString().split('T')[0]}.json`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
+                  // Create a blob and download
+                  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `onlyworks-export-${new Date().toISOString().split('T')[0]}.json`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
 
-                alert('Data exported successfully!');
+                  alert('Data exported successfully!');
+                } catch (error) {
+                  console.error('Export failed:', error);
+                  alert('Failed to export data. Please try again.');
+                }
               }}
             >
               Export Data

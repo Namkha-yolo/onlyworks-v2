@@ -1,9 +1,79 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSessionStore } from '../stores/sessionStore';
 
 type TimeRange = 'today' | 'week' | 'month' | 'year';
 
+interface ReportData {
+  totalHours: number;
+  totalSessions: number;
+  avgFocusScore: number;
+  productivity: number;
+  productivityChange: number;
+}
+
 const Reports: React.FC = () => {
   const [timeRange, setTimeRange] = useState<TimeRange>('week');
+  const { recentSessions, todayStats, getRecentSessions, getTodayStats } = useSessionStore();
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    getRecentSessions();
+    getTodayStats();
+  }, [getRecentSessions, getTodayStats]);
+
+  const calculateReportData = (): ReportData => {
+    const now = new Date();
+    let startDate: Date;
+
+    switch (timeRange) {
+      case 'today':
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        break;
+      case 'week':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'month':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      case 'year':
+        startDate = new Date(now.getFullYear(), 0, 1);
+        break;
+    }
+
+    const filteredSessions = recentSessions.filter(session =>
+      new Date(session.startTime) >= startDate
+    );
+
+    const totalHours = filteredSessions.reduce((sum, session) => sum + (session.duration / 3600), 0);
+    const totalSessions = filteredSessions.length;
+    const avgFocusScore = filteredSessions.length > 0
+      ? filteredSessions.reduce((sum, s) => sum + (s.focusScore || 0), 0) / filteredSessions.length
+      : 0;
+    const productivity = filteredSessions.length > 0
+      ? filteredSessions.reduce((sum, s) => sum + (s.productivityScore || 0), 0) / filteredSessions.length
+      : 0;
+
+    // For today, use todayStats if available
+    if (timeRange === 'today') {
+      return {
+        totalHours: todayStats.hours,
+        totalSessions: todayStats.sessions,
+        avgFocusScore: todayStats.focusScore,
+        productivity,
+        productivityChange: 5, // Default mock change
+      };
+    }
+
+    return {
+      totalHours: Math.round(totalHours * 10) / 10,
+      totalSessions,
+      avgFocusScore: Math.round(avgFocusScore),
+      productivity: Math.round(productivity),
+      productivityChange: Math.floor(Math.random() * 20) - 5, // Random change for now
+    };
+  };
+
+  const reportData = calculateReportData();
 
   return (
     <div className="h-full flex flex-col">
@@ -59,41 +129,32 @@ const Reports: React.FC = () => {
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Hours</p>
           <p className="text-3xl font-bold text-gray-900 dark:text-white">
-            {timeRange === 'today' ? '3.2' :
-             timeRange === 'week' ? '22.5' :
-             timeRange === 'month' ? '87.3' : '412.7'}
+            {reportData.totalHours.toFixed(1)}
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">This {timeRange}</p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Sessions</p>
           <p className="text-3xl font-bold text-gray-900 dark:text-white">
-            {timeRange === 'today' ? '4' :
-             timeRange === 'week' ? '28' :
-             timeRange === 'month' ? '115' : '487'}
+            {reportData.totalSessions}
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Completed</p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Avg Focus Score</p>
           <p className="text-3xl font-bold text-gray-900 dark:text-white">
-            {timeRange === 'today' ? '78' :
-             timeRange === 'week' ? '81' :
-             timeRange === 'month' ? '75' : '79'}%
+            {Math.round(reportData.avgFocusScore)}%
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Per session</p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Productivity</p>
           <p className="text-3xl font-bold text-gray-900 dark:text-white">
-            {timeRange === 'today' ? '85' :
-             timeRange === 'week' ? '88' :
-             timeRange === 'month' ? '82' : '84'}%
+            {Math.round(reportData.productivity)}%
           </p>
           <p className="text-xs text-green-600 dark:text-green-400 mt-2">
-            +{timeRange === 'today' ? '5' :
-                timeRange === 'week' ? '12' :
-                timeRange === 'month' ? '8' : '15'}% vs last {timeRange}
+            {/* TODO: Calculate actual percentage change vs previous period */}
+            +0% vs last {timeRange}
           </p>
         </div>
       </div>
