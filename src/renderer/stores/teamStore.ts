@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { backendApi } from '../services/backendApi';
 
 export interface TeamMember {
   id: string;
@@ -47,24 +48,27 @@ export const useTeamStore = create<TeamState>((set, get) => ({
   createTeam: async (name: string, description?: string) => {
     set({ loading: true });
 
-    // TODO: Call IPC to main process
-    // const team = await window.api.createTeam(name, description);
+    try {
+      // Note: Team functionality isn't implemented in backend yet
+      // Using mock data for now, but structured to be easily replaceable
+      const newTeam: Team = {
+        id: `team-${Date.now()}`,
+        name,
+        description,
+        memberCount: 1,
+        members: [],
+        createdAt: new Date(),
+        isActive: true,
+      };
 
-    // Mock team creation
-    const newTeam: Team = {
-      id: `team-${Date.now()}`,
-      name,
-      description,
-      memberCount: 1,
-      members: [],
-      createdAt: new Date(),
-      isActive: true,
-    };
-
-    set((state) => ({
-      teams: [...state.teams, newTeam],
-      loading: false,
-    }));
+      set((state) => ({
+        teams: [...state.teams, newTeam],
+        loading: false,
+      }));
+    } catch (error) {
+      console.error('Error creating team:', error);
+      set({ loading: false });
+    }
   },
 
   joinTeam: async (teamId: string) => {
@@ -129,36 +133,71 @@ export const useTeamStore = create<TeamState>((set, get) => ({
   getTeams: async () => {
     set({ loading: true });
 
-    // TODO: Call IPC to main process
-    // const teams = await window.api.getTeams();
+    try {
+      // Note: Team functionality isn't implemented in backend yet
+      // Using empty array for now, but structured to be easily replaceable
+      const teams: Team[] = [];
 
-    // Mock data
-    const mockTeams: Team[] = [];
-
-    set({ teams: mockTeams, loading: false });
+      set({ teams, loading: false });
+    } catch (error) {
+      console.error('Error fetching teams:', error);
+      set({ teams: [], loading: false });
+    }
   },
 
   getMembers: async () => {
     set({ loading: true });
 
-    // TODO: Call IPC to main process
-    // const members = await window.api.getMembers();
+    try {
+      // Try to get user profile to populate current user
+      const userResponse = await backendApi.getUserProfile();
 
-    // Mock current user
-    const currentUser: TeamMember = {
-      id: 'user-1',
-      name: 'You',
-      email: 'you@example.com',
-      role: 'Software Engineer',
-      status: 'online',
-      avatar: 'Y',
-    };
+      let currentUser: TeamMember;
 
-    set({
-      members: [currentUser],
-      currentUser,
-      loading: false,
-    });
+      if (userResponse.success && userResponse.data) {
+        currentUser = {
+          id: userResponse.data.id,
+          name: userResponse.data.display_name || 'You',
+          email: userResponse.data.email || 'you@example.com',
+          role: 'Member',
+          status: 'online',
+          avatar: userResponse.data.avatar_url || userResponse.data.display_name?.charAt(0) || 'Y',
+        };
+      } else {
+        // Fallback to mock user if profile fetch fails
+        currentUser = {
+          id: 'user-1',
+          name: 'You',
+          email: 'you@example.com',
+          role: 'Member',
+          status: 'online',
+          avatar: 'Y',
+        };
+      }
+
+      set({
+        members: [currentUser],
+        currentUser,
+        loading: false,
+      });
+    } catch (error) {
+      console.error('Error fetching members:', error);
+      // Fallback to mock user on error
+      const currentUser: TeamMember = {
+        id: 'user-1',
+        name: 'You',
+        email: 'you@example.com',
+        role: 'Member',
+        status: 'online',
+        avatar: 'Y',
+      };
+
+      set({
+        members: [currentUser],
+        currentUser,
+        loading: false,
+      });
+    }
   },
 
   updateMemberStatus: (memberId: string, status: TeamMember['status']) => {

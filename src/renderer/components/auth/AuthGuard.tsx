@@ -13,6 +13,7 @@ const AuthGuard: React.FC<AuthGuardProps> = ({
   fallback,
   requireAuth = false
 }) => {
+
   const { isAuthenticated, isLoading, initializeAuth, error, clearError } = useAuthStore();
 
   useEffect(() => {

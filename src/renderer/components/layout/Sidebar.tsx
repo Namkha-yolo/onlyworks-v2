@@ -6,7 +6,7 @@ import LoginButton from '../auth/LoginButton';
 import logoDark from '../../assets/images/logo-dark.png';
 import logoLight from '../../assets/images/logo-light.png';
 
-type Page = 'dashboard' | 'workspace' | 'sessions' | 'reports';
+type Page = 'dashboard' | 'workspace' | 'sessions' | 'reports' | 'api-demo';
 
 interface SidebarProps {
   currentPage: Page;
@@ -23,6 +23,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange, onOpenSett
     { id: 'workspace', label: 'Workspace', icon: '' },
     { id: 'sessions', label: 'Sessions', icon: '' },
     { id: 'reports', label: 'Reports', icon: '' },
+    { id: 'api-demo', label: 'API Demo', icon: '🔒' },
   ];
 
   return (

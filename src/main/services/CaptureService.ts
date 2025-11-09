@@ -3,17 +3,23 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { Screenshot, ActivityCallback } from '@shared/types';
+import { ScreenshotUploadService } from './ScreenshotUploadService';
 
 export class CaptureService {
   private isMonitoring = false;
   private activityCallbacks: ActivityCallback[] = [];
   private screenshotsDir: string;
   private uiohook: any;
+  private uploadService: ScreenshotUploadService;
+  private currentSessionId: string | null = null;
+  private captureInterval: NodeJS.Timeout | null = null;
+  private captureFrequency = 15000; // 15 seconds default
 
   constructor(dataPath: string) {
     this.screenshotsDir = path.join(dataPath, 'screenshots');
     this.ensureDirectoryExists();
     this.initializeUIOHook();
+    this.uploadService = ScreenshotUploadService.getInstance();
   }
 
   private ensureDirectoryExists() {
@@ -30,11 +36,12 @@ export class CaptureService {
     }
   }
 
-  async startMonitoring(): Promise<void> {
+  async startMonitoring(sessionId?: string): Promise<void> {
     if (this.isMonitoring) return;
 
     this.isMonitoring = true;
-    console.log('Screenshot monitoring started');
+    this.currentSessionId = sessionId || null;
+    console.log('Screenshot monitoring started for session:', sessionId);
 
     if (this.uiohook) {
       // Mouse events
@@ -49,13 +56,20 @@ export class CaptureService {
 
       this.uiohook.start();
     }
+
+    // Start automatic screenshot capture
+    this.startAutomaticCapture();
   }
 
   async stopMonitoring(): Promise<void> {
     if (!this.isMonitoring) return;
 
     this.isMonitoring = false;
+    this.currentSessionId = null;
     console.log('Screenshot monitoring stopped');
+
+    // Stop automatic capture
+    this.stopAutomaticCapture();
 
     if (this.uiohook) {
       this.uiohook.stop();
@@ -91,7 +105,7 @@ export class CaptureService {
 
       const screenshot: Screenshot = {
         id,
-        sessionId: '', // Will be set by session service
+        sessionId: this.currentSessionId || '',
         filePath,
         timestamp,
         metadata: {
@@ -103,6 +117,17 @@ export class CaptureService {
       };
 
       console.log(`Screenshot captured: ${filename}`);
+
+      // Upload screenshot if session is active
+      if (this.currentSessionId && this.isMonitoring) {
+        this.uploadService.queueScreenshot({
+          sessionId: this.currentSessionId,
+          filePath,
+          timestamp,
+          captureTriger: 'timer_15s'
+        });
+      }
+
       return screenshot;
 
     } catch (error) {
@@ -127,6 +152,56 @@ export class CaptureService {
 
   getScreenshotsDirectory(): string {
     return this.screenshotsDir;
+  }
+
+  private startAutomaticCapture(): void {
+    if (this.captureInterval) {
+      clearInterval(this.captureInterval);
+    }
+
+    console.log(`Starting automatic screenshot capture every ${this.captureFrequency}ms`);
+
+    this.captureInterval = setInterval(async () => {
+      if (this.isMonitoring && this.currentSessionId) {
+        try {
+          await this.captureScreen();
+        } catch (error) {
+          console.error('Automatic screenshot capture failed:', error);
+        }
+      }
+    }, this.captureFrequency);
+  }
+
+  private stopAutomaticCapture(): void {
+    if (this.captureInterval) {
+      clearInterval(this.captureInterval);
+      this.captureInterval = null;
+      console.log('Automatic screenshot capture stopped');
+    }
+  }
+
+  setCaptureFrequency(frequencyMs: number): void {
+    this.captureFrequency = frequencyMs;
+    if (this.isMonitoring) {
+      // Restart with new frequency
+      this.startAutomaticCapture();
+    }
+  }
+
+  getCurrentSessionId(): string | null {
+    return this.currentSessionId;
+  }
+
+  setCurrentSessionId(sessionId: string | null): void {
+    this.currentSessionId = sessionId;
+  }
+
+  getUploadQueueSize(): number {
+    return this.uploadService.getQueueSize();
+  }
+
+  isUploadInProgress(): boolean {
+    return this.uploadService.isUploadInProgress();
   }
 
   cleanup(): void {

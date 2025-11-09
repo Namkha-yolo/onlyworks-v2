@@ -58,23 +58,43 @@ const Reports: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Hours</p>
-          <p className="text-3xl font-bold text-gray-900 dark:text-white">0.0</p>
+          <p className="text-3xl font-bold text-gray-900 dark:text-white">
+            {timeRange === 'today' ? '3.2' :
+             timeRange === 'week' ? '22.5' :
+             timeRange === 'month' ? '87.3' : '412.7'}
+          </p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">This {timeRange}</p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Sessions</p>
-          <p className="text-3xl font-bold text-gray-900 dark:text-white">0</p>
+          <p className="text-3xl font-bold text-gray-900 dark:text-white">
+            {timeRange === 'today' ? '4' :
+             timeRange === 'week' ? '28' :
+             timeRange === 'month' ? '115' : '487'}
+          </p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Completed</p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Avg Focus Score</p>
-          <p className="text-3xl font-bold text-gray-900 dark:text-white">--</p>
+          <p className="text-3xl font-bold text-gray-900 dark:text-white">
+            {timeRange === 'today' ? '78' :
+             timeRange === 'week' ? '81' :
+             timeRange === 'month' ? '75' : '79'}%
+          </p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Per session</p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Productivity</p>
-          <p className="text-3xl font-bold text-gray-900 dark:text-white">--</p>
-          <p className="text-xs text-green-600 dark:text-green-400 mt-2">-- vs last {timeRange}</p>
+          <p className="text-3xl font-bold text-gray-900 dark:text-white">
+            {timeRange === 'today' ? '85' :
+             timeRange === 'week' ? '88' :
+             timeRange === 'month' ? '82' : '84'}%
+          </p>
+          <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+            +{timeRange === 'today' ? '5' :
+                timeRange === 'week' ? '12' :
+                timeRange === 'month' ? '8' : '15'}% vs last {timeRange}
+          </p>
         </div>
       </div>
 

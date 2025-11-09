@@ -7,8 +7,9 @@
  * TODO: Implement window.api interface in preload.js
  */
 
-// Import auth types
+// Import auth types and backend service
 import { AuthSession } from '../stores/authStore';
+import { backendApi } from './backendApi';
 
 // Type definitions for the IPC API
 export interface ElectronAPI {
@@ -206,10 +207,9 @@ const mockAPI: ElectronAPI = {
 };
 
 // Export the API interface
-// Use window.api if available (in Electron), otherwise fallback to mockAPI
-const useRealAPI = typeof window !== 'undefined' && window.api;
-console.log('[API] Initializing API service. Using real API:', useRealAPI);
-export const api = useRealAPI ? window.api : mockAPI;
+// Use the new backend API service that handles both real and mock implementations
+console.log('[API] Initializing API service with backend integration');
+export const api = backendApi;
 
 // Helper to check if running in Electron
 export const isElectron = () => {

@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { Session } from '@shared/types';
 import Store from 'electron-store';
+import { BackendApiService } from './BackendApiService';
 
 interface SessionStore {
   currentSession: Session | null;
@@ -10,6 +11,7 @@ interface SessionStore {
 export class SessionService {
   private store: Store<SessionStore>;
   private currentSession: Session | null = null;
+  private backendApi: BackendApiService;
 
   constructor() {
     this.store = new Store<SessionStore>({
@@ -19,6 +21,8 @@ export class SessionService {
         sessions: []
       }
     });
+
+    this.backendApi = BackendApiService.getInstance();
 
     // Load current session from store
     this.currentSession = this.store.get('currentSession');
@@ -30,25 +34,70 @@ export class SessionService {
       await this.endSession();
     }
 
-    const session: Session = {
-      id: uuidv4(),
-      userId,
-      goal,
-      startTime: Date.now(),
-      status: 'active',
-      screenshotCount: 0
-    };
+    try {
+      // Start session on backend
+      const response = await this.backendApi.startSession({
+        session_name: goal ? `Session: ${goal}` : undefined,
+        goal_description: goal
+      });
 
-    this.currentSession = session;
-    this.store.set('currentSession', session);
+      if (response.success && response.data) {
+        const backendSession = response.data;
 
-    console.log(`Session started: ${session.id} ${goal ? `(${goal})` : ''}`);
-    return session;
+        const session: Session = {
+          id: backendSession.id,
+          userId,
+          goal,
+          startTime: new Date(backendSession.started_at).getTime(),
+          status: 'active',
+          screenshotCount: 0
+        };
+
+        this.currentSession = session;
+        this.store.set('currentSession', session);
+
+        console.log(`Session started: ${session.id} ${goal ? `(${goal})` : ''}`);
+        return session;
+      } else {
+        throw new Error(response.error?.message || 'Failed to start session on backend');
+      }
+    } catch (error) {
+      console.error('Backend session start failed, falling back to local session:', error);
+
+      // Fallback to local session if backend fails
+      const session: Session = {
+        id: uuidv4(),
+        userId,
+        goal,
+        startTime: Date.now(),
+        status: 'active',
+        screenshotCount: 0
+      };
+
+      this.currentSession = session;
+      this.store.set('currentSession', session);
+
+      console.log(`Local session started: ${session.id} ${goal ? `(${goal})` : ''}`);
+      return session;
+    }
   }
 
   async endSession(): Promise<Session | null> {
     if (!this.currentSession || this.currentSession.status !== 'active') {
       return null;
+    }
+
+    try {
+      // End session on backend
+      const response = await this.backendApi.endSession(this.currentSession.id);
+
+      if (response.success) {
+        console.log('Session ended on backend successfully');
+      } else {
+        console.error('Failed to end session on backend:', response.error?.message);
+      }
+    } catch (error) {
+      console.error('Backend session end failed:', error);
     }
 
     const endedSession = {

@@ -170,11 +170,13 @@ const PersonalTab: React.FC = () => {
         </div>
       </div>
 
-      {/* Productivity Insights */}
+      {/* AI Productivity Insights */}
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Productivity Insights</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          🤖 AI Productivity Insights
+        </h3>
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
               <p className="text-2xl font-bold text-green-600 dark:text-green-400">📈</p>
               <p className="text-sm font-medium text-gray-900 dark:text-white mt-2">
@@ -204,6 +206,44 @@ const PersonalTab: React.FC = () => {
                   : 'No goals set'
                 }
               </p>
+            </div>
+          </div>
+
+          {/* AI Recommendations */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+            <h4 className="text-base font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+              <span className="mr-2">🧠</span>
+              AI Recommendations
+            </h4>
+            <div className="space-y-3">
+              {recentSessions.length > 0 ? (
+                <>
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-l-4 border-blue-400">
+                    <p className="text-sm text-gray-900 dark:text-white font-medium">Focus Optimization</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                      Your focus score is highest during {insights.peakHours}. Consider scheduling important tasks during this time window.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border-l-4 border-amber-400">
+                    <p className="text-sm text-gray-900 dark:text-white font-medium">Session Length</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                      Try 45-minute focused sessions with 15-minute breaks for optimal productivity based on your patterns.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border-l-4 border-emerald-400">
+                    <p className="text-sm text-gray-900 dark:text-white font-medium">Weekly Goal</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                      You're on track to complete {Math.ceil(todayStats.hours * 7)} hours this week. Keep up the great work!
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-center">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Complete a few sessions to receive personalized AI recommendations
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>

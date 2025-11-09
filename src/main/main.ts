@@ -1,16 +1,28 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+// Load environment variables first
+import * as dotenv from 'dotenv';
 import * as path from 'path';
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+
+console.log('Environment loaded. ONLYWORKS_SERVER_URL:', process.env.ONLYWORKS_SERVER_URL);
+
+import { app, BrowserWindow, ipcMain } from 'electron';
 import { isDev } from './utils/env';
 import { createOverlayWindow, closeOverlayWindow } from './overlayWindow';
 import { AuthService } from './services/authService';
+import { BackendApiService } from './services/BackendApiService';
+import { SecureApiProxyService } from './services/SecureApiProxyService';
 
 class OnlyWorksApp {
   private mainWindow: BrowserWindow | null = null;
   private overlayWindow: BrowserWindow | null = null;
   private authService: AuthService;
+  private backendApi: BackendApiService;
+  private secureApiProxy: SecureApiProxyService;
 
   constructor() {
     this.authService = AuthService.getInstance();
+    this.backendApi = BackendApiService.getInstance();
+    this.secureApiProxy = SecureApiProxyService.getInstance();
     this.init();
   }
 
@@ -166,7 +178,217 @@ class OnlyWorksApp {
       }
     });
 
-    // Add more IPC handlers as needed
+    // Backend API handlers
+    ipcMain.handle('api:health-check', async () => {
+      try {
+        return await this.backendApi.healthCheck();
+      } catch (error) {
+        console.error('Health check error:', error);
+        throw error;
+      }
+    });
+
+    // User management
+    ipcMain.handle('api:get-user-profile', async () => {
+      try {
+        return await this.backendApi.getUserProfile();
+      } catch (error) {
+        console.error('Get user profile error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('api:update-user-profile', async (event, profileData: any) => {
+      try {
+        return await this.backendApi.updateUserProfile(profileData);
+      } catch (error) {
+        console.error('Update user profile error:', error);
+        throw error;
+      }
+    });
+
+    // Session management
+    ipcMain.handle('api:start-session', async (event, sessionData: { session_name?: string; goal_description?: string }) => {
+      try {
+        return await this.backendApi.startSession(sessionData);
+      } catch (error) {
+        console.error('Start session error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('api:end-session', async (event, sessionId: string) => {
+      try {
+        return await this.backendApi.endSession(sessionId);
+      } catch (error) {
+        console.error('End session error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('api:pause-session', async (event, sessionId: string) => {
+      try {
+        return await this.backendApi.pauseSession(sessionId);
+      } catch (error) {
+        console.error('Pause session error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('api:resume-session', async (event, sessionId: string) => {
+      try {
+        return await this.backendApi.resumeSession(sessionId);
+      } catch (error) {
+        console.error('Resume session error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('api:get-active-session', async () => {
+      try {
+        return await this.backendApi.getActiveSession();
+      } catch (error) {
+        console.error('Get active session error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('api:get-user-sessions', async (event, options: any = {}) => {
+      try {
+        return await this.backendApi.getUserSessions(options);
+      } catch (error) {
+        console.error('Get user sessions error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('api:get-session-by-id', async (event, sessionId: string) => {
+      try {
+        return await this.backendApi.getSessionById(sessionId);
+      } catch (error) {
+        console.error('Get session by ID error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('api:update-session-scores', async (event, sessionId: string, scores: any) => {
+      try {
+        return await this.backendApi.updateSessionScores(sessionId, scores);
+      } catch (error) {
+        console.error('Update session scores error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('api:get-session-stats', async (event, dateFrom?: string, dateTo?: string) => {
+      try {
+        return await this.backendApi.getSessionStats(dateFrom, dateTo);
+      } catch (error) {
+        console.error('Get session stats error:', error);
+        throw error;
+      }
+    });
+
+    // Generic API handlers
+    ipcMain.handle('api:get', async (event, endpoint: string) => {
+      try {
+        return await this.backendApi.get(endpoint);
+      } catch (error) {
+        console.error('API GET error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('api:post', async (event, endpoint: string, body?: any) => {
+      try {
+        return await this.backendApi.post(endpoint, body);
+      } catch (error) {
+        console.error('API POST error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('api:put', async (event, endpoint: string, body?: any) => {
+      try {
+        return await this.backendApi.put(endpoint, body);
+      } catch (error) {
+        console.error('API PUT error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('api:delete', async (event, endpoint: string) => {
+      try {
+        return await this.backendApi.delete(endpoint);
+      } catch (error) {
+        console.error('API DELETE error:', error);
+        throw error;
+      }
+    });
+
+    // Secure API Proxy handlers
+    ipcMain.handle('secure-api:call', async (event, request: any) => {
+      try {
+        return await this.secureApiProxy.makeSecureApiCall(request);
+      } catch (error) {
+        console.error('Secure API call error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('secure-api:gemini', async (event, prompt: string, imageData?: string) => {
+      try {
+        return await this.secureApiProxy.callGeminiAI(prompt, imageData);
+      } catch (error) {
+        console.error('Gemini API call error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('secure-api:openai', async (event, prompt: string, model?: string) => {
+      try {
+        return await this.secureApiProxy.callOpenAI(prompt, model);
+      } catch (error) {
+        console.error('OpenAI API call error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('secure-api:custom', async (event, endpoint: string, method: string, options: any) => {
+      try {
+        return await this.secureApiProxy.callCustomAPI(endpoint, method as any, options);
+      } catch (error) {
+        console.error('Custom API call error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('secure-api:test-connectivity', async () => {
+      try {
+        return await this.secureApiProxy.testApiConnectivity();
+      } catch (error) {
+        console.error('API connectivity test error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('secure-api:update-credentials', async (event, credentials: any) => {
+      try {
+        return await this.secureApiProxy.updateCredentials(credentials);
+      } catch (error) {
+        console.error('Update credentials error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('secure-api:clear-credentials', async () => {
+      try {
+        return await this.secureApiProxy.clearCredentials();
+      } catch (error) {
+        console.error('Clear credentials error:', error);
+        throw error;
+      }
+    });
   }
 }
 

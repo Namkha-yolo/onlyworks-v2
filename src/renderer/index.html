@@ -26,19 +26,7 @@
             console.log('window.electronAPI methods:', Object.keys(window.electronAPI));
         }
 
-        // Test OAuth after React loads
-        setTimeout(() => {
-            console.log('Testing OAuth initialization...');
-            if (window.api && window.api.initOAuth) {
-                window.api.initOAuth('google').then(url => {
-                    console.log('✅ OAuth test successful! URL:', url);
-                }).catch(error => {
-                    console.log('❌ OAuth test failed:', error);
-                });
-            } else {
-                console.log('❌ window.api.initOAuth not available');
-            }
-        }, 2000);
+        // OAuth test removed - authentication now handled through UI
     </script>
 </body>
 </html>

@@ -130,14 +130,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   initializeAuth: async () => {
+
     set({ isLoading: true });
 
     try {
-      // Check for stored session
       const storedSession = await api.getStoredSession();
 
       if (storedSession) {
-        // Check if token is still valid
         const isValid = await api.validateSession(storedSession);
 
         if (isValid) {
@@ -148,7 +147,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             isLoading: false,
           });
         } else {
-          // Try to refresh if we have refresh token
           if (storedSession.refresh_token) {
             await get().refreshToken();
           } else {
