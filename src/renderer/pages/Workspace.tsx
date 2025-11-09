@@ -12,6 +12,7 @@ import InviteMemberModal from '../components/teams/InviteMemberModal';
 import JoinTeamModal from '../components/teams/JoinTeamModal';
 import TeamDetailModal from '../components/teams/TeamDetailModal';
 import MemberProfileModal from '../components/teams/MemberProfileModal';
+import InputDialog from '../components/common/InputDialog';
 import { calculateInsights } from '../utils/calculateInsights';
 
 const Workspace: React.FC = () => {
@@ -79,6 +80,7 @@ const Workspace: React.FC = () => {
 const PersonalTab: React.FC = () => {
   const { activeSession, todayStats, recentSessions, getTodayStats, startSession, getRecentSessions } = useSessionStore();
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [showSessionDialog, setShowSessionDialog] = useState(false);
 
   useEffect(() => {
     getTodayStats();
@@ -88,10 +90,11 @@ const PersonalTab: React.FC = () => {
   const insights = calculateInsights(recentSessions, goals);
 
   const handleStartSession = () => {
-    const goal = prompt('Enter your session goal:');
-    if (goal) {
-      startSession(goal);
-    }
+    setShowSessionDialog(true);
+  };
+
+  const handleSessionSubmit = (goal: string) => {
+    startSession(goal);
   };
 
   return (
@@ -254,6 +257,15 @@ const PersonalTab: React.FC = () => {
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Activity</h3>
         <RecentActivityList sessions={recentSessions} limit={10} />
       </div>
+
+      <InputDialog
+        isOpen={showSessionDialog}
+        onClose={() => setShowSessionDialog(false)}
+        onSubmit={handleSessionSubmit}
+        title="Start New Session"
+        placeholder="Enter your session goal..."
+        submitLabel="Start Session"
+      />
     </div>
   );
 };

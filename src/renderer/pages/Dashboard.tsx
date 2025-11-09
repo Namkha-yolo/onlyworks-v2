@@ -1,18 +1,21 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
+import InputDialog from '../components/common/InputDialog';
 
 const Dashboard: React.FC = () => {
   const { todayStats, getTodayStats, startSession } = useSessionStore();
+  const [showSessionDialog, setShowSessionDialog] = useState(false);
 
   useEffect(() => {
     getTodayStats();
   }, [getTodayStats]);
 
   const handleStartSession = () => {
-    const goal = prompt('Enter your session goal:');
-    if (goal) {
-      startSession(goal);
-    }
+    setShowSessionDialog(true);
+  };
+
+  const handleSessionSubmit = (goal: string) => {
+    startSession(goal);
   };
 
   return (
@@ -142,6 +145,15 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <InputDialog
+        isOpen={showSessionDialog}
+        onClose={() => setShowSessionDialog(false)}
+        onSubmit={handleSessionSubmit}
+        title="Start New Session"
+        placeholder="Enter your session goal..."
+        submitLabel="Start Session"
+      />
     </div>
   );
 };
