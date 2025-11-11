@@ -8,9 +8,9 @@ export function createOverlayWindow(): BrowserWindow {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.workAreaSize;
 
-  // Calculate initial position (top center)
-  const overlayWidth = 300;
-  const overlayHeight = 50;
+  // Calculate initial position (top center) - start collapsed
+  const overlayWidth = 60; // Larger floating bubble size
+  const overlayHeight = 60;
   const initialX = Math.floor(width / 2 - overlayWidth / 2);
   const initialY = 20;
 
@@ -113,8 +113,8 @@ export function createOverlayWindow(): BrowserWindow {
           case 'top':
           case 'bottom':
             // Horizontal layout - preserve X position, snap Y to edge
-            newWidth = 300;
-            newHeight = 50;
+            newWidth = 320;
+            newHeight = 80;
             // Keep X position but clamp to screen bounds
             snapX = Math.max(margin, Math.min(x, width - newWidth - margin));
             snapY = nearestEdge === 'top' ? margin : height - newHeight - margin;
@@ -122,8 +122,8 @@ export function createOverlayWindow(): BrowserWindow {
           case 'left':
           case 'right':
             // Vertical layout - preserve Y position, snap X to edge
-            newWidth = 80;
-            newHeight = 240;
+            newWidth = 100;
+            newHeight = 280;
             snapX = nearestEdge === 'left' ? margin : width - newWidth - margin;
             // Keep Y position but clamp to screen bounds
             snapY = Math.max(margin, Math.min(y, height - newHeight - margin));

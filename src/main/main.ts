@@ -3,7 +3,9 @@ import * as dotenv from 'dotenv';
 import * as path from 'path';
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
-console.log('Environment loaded. ONLYWORKS_SERVER_URL:', process.env.ONLYWORKS_SERVER_URL);
+console.log('[Main] Environment loaded.');
+console.log('[Main] ONLYWORKS_SERVER_URL:', process.env.ONLYWORKS_SERVER_URL);
+console.log('[Main] GOOGLE_API_KEY:', process.env.GOOGLE_API_KEY ? `${process.env.GOOGLE_API_KEY.substring(0, 10)}... (${process.env.GOOGLE_API_KEY.length} chars)` : 'NOT SET');
 
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { isDev } from './utils/env';
@@ -11,6 +13,8 @@ import { createOverlayWindow, closeOverlayWindow } from './overlayWindow';
 import { AuthService } from './services/authService';
 import { BackendApiService } from './services/BackendApiService';
 import { SecureApiProxyService } from './services/SecureApiProxyService';
+import { GeminiAnalysisService } from './services/GeminiAnalysisService';
+import { ScreenshotAnalysisService } from './services/ScreenshotAnalysisService';
 
 class OnlyWorksApp {
   private mainWindow: BrowserWindow | null = null;
@@ -18,11 +22,15 @@ class OnlyWorksApp {
   private authService: AuthService;
   private backendApi: BackendApiService;
   private secureApiProxy: SecureApiProxyService;
+  private aiAnalysisService: GeminiAnalysisService;
+  private screenshotService: ScreenshotAnalysisService;
 
   constructor() {
     this.authService = AuthService.getInstance();
     this.backendApi = BackendApiService.getInstance();
     this.secureApiProxy = SecureApiProxyService.getInstance();
+    this.aiAnalysisService = GeminiAnalysisService.getInstance();
+    this.screenshotService = ScreenshotAnalysisService.getInstance();
     this.init();
   }
 
@@ -43,8 +51,32 @@ class OnlyWorksApp {
 
     // Handle app window closed
     app.on('window-all-closed', () => {
+      // Close overlay window when all windows are closed
+      if (this.overlayWindow) {
+        this.overlayWindow.close();
+        this.overlayWindow = null;
+      }
+
       if (process.platform !== 'darwin') {
         app.quit();
+      }
+    });
+
+    // Handle app before quit
+    app.on('before-quit', () => {
+      // Ensure overlay window is closed before app quits
+      if (this.overlayWindow) {
+        this.overlayWindow.close();
+        this.overlayWindow = null;
+      }
+    });
+
+    // Handle app will quit - final cleanup
+    app.on('will-quit', (event) => {
+      // Final overlay cleanup
+      if (this.overlayWindow) {
+        this.overlayWindow.close();
+        this.overlayWindow = null;
       }
     });
 
@@ -86,6 +118,11 @@ class OnlyWorksApp {
 
     this.mainWindow.on('closed', () => {
       this.mainWindow = null;
+      // Also close overlay when main window is closed
+      if (this.overlayWindow) {
+        this.overlayWindow.close();
+        this.overlayWindow = null;
+      }
     });
   }
 
@@ -207,10 +244,24 @@ class OnlyWorksApp {
       }
     });
 
-    // Session management
+    // Broadcast session updates to all windows
+    const broadcastSessionUpdate = (session: any) => {
+      if (this.mainWindow) {
+        this.mainWindow.webContents.send('session:updated', session);
+      }
+      if (this.overlayWindow) {
+        this.overlayWindow.webContents.send('session:updated', session);
+      }
+    };
+
+    // Session management with broadcasting
     ipcMain.handle('api:start-session', async (event, sessionData: { session_name?: string; goal_description?: string }) => {
       try {
-        return await this.backendApi.startSession(sessionData);
+        const result = await this.backendApi.startSession(sessionData);
+        if (result.success && result.data) {
+          broadcastSessionUpdate(result.data);
+        }
+        return result;
       } catch (error) {
         console.error('Start session error:', error);
         throw error;
@@ -219,7 +270,11 @@ class OnlyWorksApp {
 
     ipcMain.handle('api:end-session', async (event, sessionId: string) => {
       try {
-        return await this.backendApi.endSession(sessionId);
+        const result = await this.backendApi.endSession(sessionId);
+        if (result.success) {
+          broadcastSessionUpdate(null); // No active session
+        }
+        return result;
       } catch (error) {
         console.error('End session error:', error);
         throw error;
@@ -228,7 +283,11 @@ class OnlyWorksApp {
 
     ipcMain.handle('api:pause-session', async (event, sessionId: string) => {
       try {
-        return await this.backendApi.pauseSession(sessionId);
+        const result = await this.backendApi.pauseSession(sessionId);
+        if (result.success && result.data) {
+          broadcastSessionUpdate(result.data);
+        }
+        return result;
       } catch (error) {
         console.error('Pause session error:', error);
         throw error;
@@ -237,7 +296,11 @@ class OnlyWorksApp {
 
     ipcMain.handle('api:resume-session', async (event, sessionId: string) => {
       try {
-        return await this.backendApi.resumeSession(sessionId);
+        const result = await this.backendApi.resumeSession(sessionId);
+        if (result.success && result.data) {
+          broadcastSessionUpdate(result.data);
+        }
+        return result;
       } catch (error) {
         console.error('Resume session error:', error);
         throw error;
@@ -516,6 +579,240 @@ class OnlyWorksApp {
       } catch (error) {
         console.error('Clear credentials error:', error);
         throw error;
+      }
+    });
+
+    // AI Analysis handlers
+    ipcMain.handle('ai:analyze-session', async (event, context: any) => {
+      try {
+        const result = await this.aiAnalysisService.analyzeSession(context);
+        // Store the analysis result in the backend
+        if (result) {
+          await this.backendApi.saveSessionAnalysis(context.session.id, {
+            ...result,
+            ai_provider: 'gemini',
+            analysis_type: 'session_complete'
+          });
+        }
+        return result;
+      } catch (error) {
+        console.error('AI analysis error:', error);
+        throw error;
+      }
+    });
+
+    // NEW: OnlyWorks comprehensive AI analysis
+    ipcMain.handle('ai:analyze-work-session', async (event, request: any) => {
+      try {
+        const response = await this.aiAnalysisService.analyzeWorkSession(request);
+
+        // Store the comprehensive analysis in backend if successful
+        if (response.success && response.data) {
+          try {
+            await this.backendApi.saveSessionAnalysis(request.context.session.id, {
+              productivity_score: response.data.goalAlignment.alignmentScore,
+              focus_patterns: {
+                applications: response.data.applications,
+                time_breakdown: response.data.summary.timeBreakdown,
+                blockers: response.data.blockers
+              },
+              recommendations: {
+                immediate: response.data.nextSteps.immediate,
+                weekly: response.data.nextSteps.shortTerm,
+                automation: response.data.automation.suggestions
+              },
+              insights: {
+                recognition: response.data.recognition,
+                communication: response.data.communication,
+                goal_alignment: response.data.goalAlignment
+              },
+              ai_provider: 'gemini',
+              analysis_type: 'onlyworks_comprehensive'
+            });
+          } catch (backendError) {
+            console.warn('Failed to store analysis in backend:', backendError);
+            // Continue with response even if storage fails
+          }
+        }
+
+        return response;
+      } catch (error) {
+        console.error('OnlyWorks AI analysis error:', error);
+        return {
+          success: false,
+          error: {
+            code: 'ANALYSIS_FAILED',
+            message: error instanceof Error ? error.message : 'Analysis failed'
+          },
+          metadata: {
+            requestId: `error_${Date.now()}`,
+            processingTime: 0
+          }
+        };
+      }
+    });
+
+    ipcMain.handle('ai:get-analysis', async (event, { sessions, goals }) => {
+      try {
+        // Get AI recommendations based on session data
+        const recommendations = await this.aiAnalysisService.generateRecommendations(sessions, goals);
+        const patterns = await this.aiAnalysisService.analyzeWorkingPatterns(sessions);
+
+        return {
+          productivity_score: 75, // Could be calculated from recent sessions
+          working_style: 'Focused with regular breaks',
+          efficiency_trends: 'Improving over time',
+          optimal_hours: patterns.optimal_hours,
+          break_suggestions: patterns.break_suggestions,
+          session_length_recommendation: patterns.session_length_recommendation,
+          ai_recommendations: recommendations,
+          generated_at: new Date().toISOString()
+        };
+      } catch (error) {
+        console.error('Get AI analysis error:', error);
+        return undefined; // Return undefined to fall back to rule-based
+      }
+    });
+
+    ipcMain.handle('ai:get-recommendations', async (event, options: any) => {
+      try {
+        return await this.backendApi.getPersonalizedRecommendations(options);
+      } catch (error) {
+        console.error('Get AI recommendations error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('ai:get-patterns', async (event, options: any) => {
+      try {
+        return await this.backendApi.getWorkingPatternAnalysis(options);
+      } catch (error) {
+        console.error('Get working patterns error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('ai:get-insights', async (_event, options: any) => {
+      try {
+        return await this.backendApi.getUserAnalysisInsights(options);
+      } catch (error) {
+        console.error('Get AI insights error:', error);
+        throw error;
+      }
+    });
+
+    // Test AI analysis function
+    ipcMain.handle('ai:test-analysis', async () => {
+      try {
+        console.log('[Main] Running AI analysis test...');
+        const result = await this.aiAnalysisService.testAnalysis();
+        console.log('[Main] Test analysis result:', result.success ? 'SUCCESS' : 'FAILED');
+        if (result.success) {
+          console.log('[Main] Test analysis summary:', result.data?.summary.reportReadySummary);
+        } else {
+          console.log('[Main] Test analysis error:', result.error?.message);
+        }
+        return result;
+      } catch (error) {
+        console.error('[Main] AI test analysis error:', error);
+        throw error;
+      }
+    });
+
+    // Overlay management handlers
+    ipcMain.handle('overlay:set-size', async (_event, width: number, height: number) => {
+      if (this.overlayWindow) {
+        this.overlayWindow.setSize(width, height, true);
+        return { success: true };
+      }
+      return { success: false, error: 'Overlay window not found' };
+    });
+
+    ipcMain.handle('overlay:set-position', async (event, x: number, y: number) => {
+      if (this.overlayWindow) {
+        this.overlayWindow.setPosition(x, y, true);
+        return { success: true };
+      }
+      return { success: false, error: 'Overlay window not found' };
+    });
+
+    // Session synchronization between main app and overlay
+    ipcMain.handle('session:sync', async () => {
+      // Get active session from backend
+      try {
+        const activeSession = await this.backendApi.getActiveSession();
+        broadcastSessionUpdate(activeSession);
+        return activeSession;
+      } catch (error) {
+        console.error('Session sync error:', error);
+        return null;
+      }
+    });
+
+    // Screenshot Analysis handlers
+    ipcMain.handle('screenshot:start-capture', async (event, sessionId: string, options: any) => {
+      try {
+        console.log(`[Main] Starting screenshot capture for session ${sessionId} with options:`, options);
+        await this.screenshotService.startCapture(sessionId, {
+          interval: options.interval || 30000, // Default 30 seconds in milliseconds
+          quality: options.quality || 80,
+          excludeApps: options.excludeApps || [],
+          includeMousePosition: options.includeMousePosition || false,
+          privacyMode: options.privacyMode || false,
+          enableEventTriggers: options.enableEventTriggers !== false,
+          supabaseBatchSize: options.supabaseBatchSize || 10,
+          sessionGoal: options.sessionGoal || 'General Work Session',
+          userGoals: options.userGoals || {
+            personalMicro: [],
+            personalMacro: [],
+            teamMicro: [],
+            teamMacro: []
+          }
+        });
+        return { success: true };
+      } catch (error) {
+        console.error('Start screenshot capture error:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+      }
+    });
+
+    ipcMain.handle('screenshot:stop-capture', async () => {
+      try {
+        console.log('[Main] Stopping screenshot capture...');
+        const result = await this.screenshotService.stopCapture();
+        return { success: true, screenshotCount: result.screenshots?.length || 0, finalAnalysis: result.finalAnalysis };
+      } catch (error) {
+        console.error('Stop screenshot capture error:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+      }
+    });
+
+    ipcMain.handle('screenshot:get-status', async () => {
+      try {
+        return this.screenshotService.getStatus();
+      } catch (error) {
+        console.error('Get screenshot status error:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('screenshot:build-analysis-request', async (event, sessionData: any, goals: any, options: any) => {
+      try {
+        const request = await this.screenshotService.buildAnalysisRequest(sessionData, goals, options);
+        return { success: true, data: request };
+      } catch (error) {
+        console.error('Build analysis request error:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+      }
+    });
+
+    ipcMain.handle('screenshot:cleanup', async () => {
+      try {
+        await this.screenshotService.cleanup();
+        return { success: true };
+      } catch (error) {
+        console.error('Screenshot cleanup error:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
       }
     });
   }

@@ -9,6 +9,11 @@ export interface CaptureSettings {
 export interface AISettings {
   enableAI: boolean;
   privacyMode: boolean;
+  aiProvider: 'gemini' | 'openai' | 'local';
+  autoAnalysis: boolean;
+  analysisFrequency: 'session' | 'daily' | 'weekly';
+  includeScreenshots: boolean;
+  shareAnonymousData: boolean;
 }
 
 export interface NotificationSettings {
@@ -38,6 +43,11 @@ const defaultSettings = {
   ai: {
     enableAI: true,
     privacyMode: false,
+    aiProvider: 'gemini' as const,
+    autoAnalysis: true,
+    analysisFrequency: 'session' as const,
+    includeScreenshots: true,
+    shareAnonymousData: false,
   },
   notifications: {
     enableNotifications: true,
@@ -74,10 +84,16 @@ export const useSettingsStore = create<SettingsState>()(
       saveSettings: async () => {
         const { capture, ai, notifications } = get();
 
-        // TODO: Call IPC to main process
-        // await window.api.saveSettings({ capture, ai, notifications });
-
-        set({ hasUnsavedChanges: false });
+        try {
+          if (typeof window !== 'undefined' && window.api) {
+            await window.api.saveSettings({ capture, ai, notifications });
+          }
+          set({ hasUnsavedChanges: false });
+        } catch (error) {
+          console.error('Failed to save settings:', error);
+          // Still mark as saved to prevent blocking the UI
+          set({ hasUnsavedChanges: false });
+        }
       },
 
       resetSettings: () => {
@@ -88,10 +104,22 @@ export const useSettingsStore = create<SettingsState>()(
       },
 
       loadSettings: async () => {
-        // TODO: Call IPC to main process
-        // const settings = await window.api.loadSettings();
-
-        // For now, use persisted settings from localStorage
+        try {
+          if (typeof window !== 'undefined' && window.api) {
+            const settings = await window.api.loadSettings();
+            if (settings.success && settings.data) {
+              set({
+                capture: { ...defaultSettings.capture, ...settings.data.capture },
+                ai: { ...defaultSettings.ai, ...settings.data.ai },
+                notifications: { ...defaultSettings.notifications, ...settings.data.notifications },
+                hasUnsavedChanges: false,
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Failed to load settings:', error);
+          // Use default/persisted settings
+        }
       },
     }),
     {

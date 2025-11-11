@@ -414,6 +414,79 @@ export class BackendApiService {
     return this.makeRequest('POST', `/api/sessions/${sessionId}/screenshots`, screenshotData);
   }
 
+  // AI Analysis endpoints
+  async saveSessionAnalysis(sessionId: string, analysisData: {
+    productivity_score: number;
+    focus_patterns: any;
+    recommendations: any;
+    insights: any;
+    ai_provider: string;
+    analysis_type: string;
+  }): Promise<ApiResponse> {
+    return this.makeRequest('POST', `/api/sessions/${sessionId}/analysis`, analysisData);
+  }
+
+  async getSessionAnalysis(sessionId: string): Promise<ApiResponse> {
+    return this.makeRequest('GET', `/api/sessions/${sessionId}/analysis`);
+  }
+
+  async getUserAnalysisInsights(options: {
+    page?: number;
+    limit?: number;
+    date_from?: string;
+    date_to?: string;
+    analysis_type?: string;
+  } = {}): Promise<ApiResponse> {
+    const queryParams = new URLSearchParams();
+
+    Object.entries(options).forEach(([key, value]) => {
+      if (value !== undefined) {
+        queryParams.append(key, value.toString());
+      }
+    });
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/analysis/insights${queryString ? `?${queryString}` : ''}`;
+
+    return this.makeRequest('GET', endpoint);
+  }
+
+  async getPersonalizedRecommendations(options: {
+    timeframe?: 'daily' | 'weekly' | 'monthly';
+    category?: 'productivity' | 'focus' | 'goals';
+  } = {}): Promise<ApiResponse> {
+    const queryParams = new URLSearchParams();
+
+    Object.entries(options).forEach(([key, value]) => {
+      if (value !== undefined) {
+        queryParams.append(key, value.toString());
+      }
+    });
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/analysis/recommendations${queryString ? `?${queryString}` : ''}`;
+
+    return this.makeRequest('GET', endpoint);
+  }
+
+  async getWorkingPatternAnalysis(options: {
+    weeks?: number;
+    include_predictions?: boolean;
+  } = {}): Promise<ApiResponse> {
+    const queryParams = new URLSearchParams();
+
+    Object.entries(options).forEach(([key, value]) => {
+      if (value !== undefined) {
+        queryParams.append(key, value.toString());
+      }
+    });
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/analysis/patterns${queryString ? `?${queryString}` : ''}`;
+
+    return this.makeRequest('GET', endpoint);
+  }
+
   // Generic request method for custom endpoints
   async get<T = any>(endpoint: string): Promise<ApiResponse<T>> {
     return this.makeRequest('GET', endpoint);

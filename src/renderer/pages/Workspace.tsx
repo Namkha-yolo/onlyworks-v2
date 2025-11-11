@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 import { useSessionStore } from '../stores/sessionStore';
 import { useTeamStore } from '../stores/teamStore';
-import { Goal } from '../components/goals/GoalsManager';
+import { Goal } from '../stores/goalsStore';
 import GoalsManager from '../components/goals/GoalsManager';
 import WeeklyChart from '../components/charts/WeeklyChart';
 import ActivityBreakdown from '../components/charts/ActivityBreakdown';

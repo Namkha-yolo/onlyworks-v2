@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Goal } from './GoalsManager';
+import type { Goal } from '../../stores/goalsStore';
 
 interface GoalCardProps {
   goal: Goal;
@@ -22,13 +22,13 @@ const GoalCard: React.FC<GoalCardProps> = ({
 
   const getStatusColor = () => {
     if (goal.status === 'completed') return 'text-green-600 dark:text-green-400';
-    if (goal.status === 'paused') return 'text-yellow-600 dark:text-yellow-400';
+    if (goal.status === 'blocked') return 'text-yellow-600 dark:text-yellow-400';
     return 'text-primary-600 dark:text-primary-400';
   };
 
   const getStatusIcon = () => {
     if (goal.status === 'completed') return '✓';
-    if (goal.status === 'paused') return '⏸';
+    if (goal.status === 'blocked') return '⏸';
     return '►';
   };
 
@@ -54,9 +54,9 @@ const GoalCard: React.FC<GoalCardProps> = ({
               {goal.description}
             </p>
           )}
-          {goal.targetDate && (
+          {goal.dueDate && (
             <p className="text-xs text-gray-500 dark:text-gray-500">
-              Target: {formatDate(goal.targetDate)}
+              Target: {formatDate(goal.dueDate)}
             </p>
           )}
         </div>
@@ -66,10 +66,10 @@ const GoalCard: React.FC<GoalCardProps> = ({
             <button
               onClick={onToggleStatus}
               className="p-1.5 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
-              title={goal.status === 'active' ? 'Pause goal' : 'Resume goal'}
+              title={goal.status === 'in-progress' ? 'Block goal' : 'Resume goal'}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                {goal.status === 'active' ? (
+                {goal.status === 'in-progress' ? (
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 ) : (
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
@@ -109,7 +109,7 @@ const GoalCard: React.FC<GoalCardProps> = ({
             className={`h-2 rounded-full transition-all duration-300 ${
               goal.status === 'completed'
                 ? 'bg-green-500 dark:bg-green-600'
-                : goal.status === 'paused'
+                : goal.status === 'blocked'
                 ? 'bg-yellow-500 dark:bg-yellow-600'
                 : 'bg-primary-600 dark:bg-primary-500'
             }`}
@@ -124,7 +124,7 @@ const GoalCard: React.FC<GoalCardProps> = ({
             value={goal.progress}
             onChange={handleProgressChange}
             className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
-            disabled={goal.status === 'paused'}
+            disabled={goal.status === 'blocked'}
           />
         )}
       </div>

@@ -14,6 +14,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   removeAllListeners: (channel: string) => {
     ipcRenderer.removeAllListeners(channel);
   },
+
+  // Send events to main process
+  send: (channel: string, data?: any) => {
+    ipcRenderer.send(channel, data);
+  },
 });
 
 // Expose auth API
@@ -62,8 +67,6 @@ contextBridge.exposeInMainWorld('api', {
   saveSettings: (settings: any) => ipcRenderer.invoke('api:save-settings', settings),
   loadSettings: () => ipcRenderer.invoke('api:load-settings'),
   getAnalytics: (timeRange: string) => ipcRenderer.invoke('api:get-analytics', timeRange),
-  exportData: (format: string) => ipcRenderer.invoke('api:export-data', format),
-  exportReport: (timeRange: string, format: string) => ipcRenderer.invoke('api:export-report', timeRange, format),
   generateIndividualReport: (timeRange: string) => ipcRenderer.invoke('api:generate-individual-report', timeRange),
   generateActivitySummaryReport: (timeRange: string) => ipcRenderer.invoke('api:generate-activity-summary-report', timeRange),
 
@@ -75,6 +78,36 @@ contextBridge.exposeInMainWorld('api', {
   testApiConnectivity: () => ipcRenderer.invoke('secure-api:test-connectivity'),
   updateApiCredentials: (credentials: any) => ipcRenderer.invoke('secure-api:update-credentials', credentials),
   clearApiCredentials: () => ipcRenderer.invoke('secure-api:clear-credentials'),
+
+  // AI Analysis methods
+  analyzeSession: (context: any) => ipcRenderer.invoke('ai:analyze-session', context),
+  analyzeWorkSession: (request: any) => ipcRenderer.invoke('ai:analyze-work-session', request),
+  testAIAnalysis: () => ipcRenderer.invoke('ai:test-analysis'),
+  getAIAnalysis: (data: { sessions: any[]; goals: any[] }) => ipcRenderer.invoke('ai:get-analysis', data),
+  getAIRecommendations: (options?: any) => ipcRenderer.invoke('ai:get-recommendations', options),
+  getWorkingPatterns: (options?: any) => ipcRenderer.invoke('ai:get-patterns', options),
+  getAIInsights: (options?: any) => ipcRenderer.invoke('ai:get-insights', options),
+
+  // Screenshot Analysis methods
+  startScreenshotCapture: (sessionId: string, options?: any) => ipcRenderer.invoke('screenshot:start-capture', sessionId, options),
+  stopScreenshotCapture: () => ipcRenderer.invoke('screenshot:stop-capture'),
+  getScreenshotStatus: () => ipcRenderer.invoke('screenshot:get-status'),
+  buildAnalysisRequest: (sessionData: any, goals: any, options: any) => ipcRenderer.invoke('screenshot:build-analysis-request', sessionData, goals, options),
+  cleanupScreenshots: () => ipcRenderer.invoke('screenshot:cleanup'),
+  forceUploadScreenshots: () => ipcRenderer.invoke('screenshot:force-upload'),
+  getUploadStatus: () => ipcRenderer.invoke('screenshot:get-upload-status'),
+
+  // Continuous Analysis methods
+  getContinuousAnalysisStatus: () => ipcRenderer.invoke('ai:get-continuous-status'),
+  forceProcessAnalysisQueue: () => ipcRenderer.invoke('ai:force-process-queue'),
+  getSessionAnalysesSummary: () => ipcRenderer.invoke('screenshot:get-session-analyses'),
+
+  // Overlay management methods
+  setOverlaySize: (width: number, height: number) => ipcRenderer.invoke('overlay:set-size', width, height),
+  setOverlayPosition: (x: number, y: number) => ipcRenderer.invoke('overlay:set-position', x, y),
+
+  // Session synchronization
+  syncSession: () => ipcRenderer.invoke('session:sync'),
 });
 
 // Type definitions for the exposed API
@@ -131,8 +164,6 @@ declare global {
       saveSettings: (settings: any) => Promise<void>;
       loadSettings: () => Promise<any>;
       getAnalytics: (timeRange: string) => Promise<any>;
-      exportData: (format: string) => Promise<void>;
-      exportReport: (timeRange: string, format: string) => Promise<void>;
       generateIndividualReport: (timeRange: string) => Promise<any>;
       generateActivitySummaryReport: (timeRange: string) => Promise<any>;
 
@@ -144,6 +175,35 @@ declare global {
       testApiConnectivity: () => Promise<Record<string, boolean>>;
       updateApiCredentials: (credentials: any) => Promise<boolean>;
       clearApiCredentials: () => Promise<boolean>;
+
+      // AI Analysis methods
+      analyzeSession: (context: any) => Promise<any>;
+      analyzeWorkSession: (request: any) => Promise<any>;
+      getAIAnalysis: (data: { sessions: any[]; goals: any[] }) => Promise<any>;
+      getAIRecommendations: (options?: any) => Promise<any>;
+      getWorkingPatterns: (options?: any) => Promise<any>;
+      getAIInsights: (options?: any) => Promise<any>;
+
+      // Screenshot Analysis methods
+      startScreenshotCapture: (sessionId: string, options?: any) => Promise<any>;
+      stopScreenshotCapture: () => Promise<any>;
+      getScreenshotStatus: () => Promise<any>;
+      buildAnalysisRequest: (sessionData: any, goals: any, options: any) => Promise<any>;
+      cleanupScreenshots: () => Promise<any>;
+      forceUploadScreenshots: () => Promise<any>;
+      getUploadStatus: () => Promise<any>;
+
+      // Continuous Analysis methods
+      getContinuousAnalysisStatus: () => Promise<any>;
+      forceProcessAnalysisQueue: () => Promise<any>;
+      getSessionAnalysesSummary: () => Promise<any>;
+
+      // Overlay management methods
+      setOverlaySize: (width: number, height: number) => Promise<any>;
+      setOverlayPosition: (x: number, y: number) => Promise<any>;
+
+      // Session synchronization
+      syncSession: () => Promise<any>;
     };
   }
 }

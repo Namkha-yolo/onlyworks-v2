@@ -1,10 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
-import InputDialog from '../components/common/InputDialog';
+import { useAuthStore } from '../stores/authStore';
+import { formatDuration, formatTimeAgo } from '../utils/timeUtils';
 
 const Dashboard: React.FC = () => {
-  const { todayStats, recentSessions, getTodayStats, getRecentSessions, startSession } = useSessionStore();
-  const [showSessionDialog, setShowSessionDialog] = useState(false);
+  const { todayStats, recentSessions, activeSession, getTodayStats, getRecentSessions, startSession } = useSessionStore();
+  const { user } = useAuthStore();
+  const [showGoalModal, setShowGoalModal] = useState(false);
+  const [sessionNameInput, setSessionNameInput] = useState('');
+  const [goalInput, setGoalInput] = useState('');
 
   useEffect(() => {
     getTodayStats();
@@ -12,176 +16,194 @@ const Dashboard: React.FC = () => {
   }, [getTodayStats, getRecentSessions]);
 
   const handleStartSession = () => {
-    setShowSessionDialog(true);
+    setShowGoalModal(true);
   };
 
-  const handleSessionSubmit = (goal: string) => {
-    startSession(goal);
+  const handleGoalSubmit = () => {
+    const sessionName = sessionNameInput.trim() || `Session - ${new Date().toLocaleDateString()}`;
+    const goal = goalInput.trim() || 'General Work Session';
+
+    startSession(sessionName, goal);
+    setSessionNameInput('');
+    setGoalInput('');
+    setShowGoalModal(false);
+  };
+
+  const handleModalClose = () => {
+    setSessionNameInput('');
+    setGoalInput('');
+    setShowGoalModal(false);
   };
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Overview</h1>
-        <button className="btn-primary" onClick={handleStartSession}>
-          Start Session
-        </button>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            Welcome back, {user?.name || 'there'}
+          </h1>
+          <p className="text-gray-500 dark:text-gray-400">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          </p>
+        </div>
+        {!activeSession && (
+          <button
+            onClick={handleStartSession}
+            className="btn-primary"
+          >
+            Start Session
+          </button>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="card">
-          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
-            Today's Sessions
-          </h3>
-          <p className="text-3xl font-bold text-gray-900 dark:text-white">{todayStats.sessions}</p>
+          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Today's Sessions</div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-white">{todayStats.sessions || 0}</div>
         </div>
-
         <div className="card">
-          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
-            Total Sessions
-          </h3>
-          <p className="text-3xl font-bold text-gray-900 dark:text-white">
-            {recentSessions.length}
-          </p>
+          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Focus Score</div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-white">
+            {Math.round((todayStats.focusScore || 0) * 10)}%
+          </div>
         </div>
-
         <div className="card">
-          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
-            Focus Score
-          </h3>
-          <p className="text-3xl font-bold text-primary-600 dark:text-primary-400">
-            {todayStats.focusScore > 0 ? `${todayStats.focusScore}%` : '--'}
-          </p>
+          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Active Time</div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-white">
+            {Math.floor(todayStats.hours || 0)}h {Math.round((todayStats.hours || 0) * 60 % 60)}m
+          </div>
         </div>
-
         <div className="card">
-          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
-            Active Time
-          </h3>
-          <p className="text-3xl font-bold text-gray-900 dark:text-white">
-            {todayStats.hours > 0 ? `${todayStats.hours.toFixed(1)}h` : '0.0h'}
-          </p>
+          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Weekly Goal</div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-white">
+            {Math.min(100, Math.round((todayStats.hours || 0) * 100 / 40))}%
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Recent Activity
-          </h3>
-          <div className="space-y-3">
-            {recentSessions.length > 0 ? (
-              recentSessions.slice(0, 3).map((session) => {
-                const duration = Math.floor(session.duration / 60); // Convert to minutes
-                const focusScore = session.focusScore || 0;
-
-                let focusLevel = 'Unknown';
-                let focusClass = 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200';
-
-                if (focusScore >= 80) {
-                  focusLevel = 'High Focus';
-                  focusClass = 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200';
-                } else if (focusScore >= 60) {
-                  focusLevel = 'Medium Focus';
-                  focusClass = 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200';
-                } else if (focusScore > 0) {
-                  focusLevel = 'Low Focus';
-                  focusClass = 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200';
-                }
-
-                return (
-                  <div key={session.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">
-                        {session.goal}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {duration > 0 ? `${duration} minutes` : 'Just started'} • {new Date(session.startTime).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <span className={`text-xs px-2 py-1 rounded ${focusClass}`}>
-                      {focusLevel}
-                    </span>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="text-center py-6">
-                <p className="text-sm text-gray-500 dark:text-gray-400">No recent sessions</p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Start your first session to see activity here</p>
+      {/* Active Session */}
+      {activeSession && (
+        <div className="card bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-sm font-medium text-green-600 dark:text-green-400">
+                  Session in progress
+                </span>
               </div>
-            )}
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {activeSession.goal || 'Current Session'}
+              </h3>
+            </div>
           </div>
         </div>
+      )}
 
-        <div className="card">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Quick Actions
-          </h3>
+      {/* Recent Activity */}
+      <div className="card">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Activity</h2>
+
+        {recentSessions.length > 0 ? (
           <div className="space-y-3">
-            <button className="w-full btn-primary" onClick={handleStartSession}>
-              Start New Session
-            </button>
-            <button
-              className="w-full btn-secondary"
-              onClick={async () => {
-                try {
-                  // Gather comprehensive data from backend
-                  const exportData = {
-                    exportedAt: new Date().toISOString(),
-                    todayStats: {
-                      sessions: todayStats.sessions,
-                      hours: todayStats.hours,
-                      focusScore: todayStats.focusScore
-                    },
-                    recentSessions: recentSessions.map(session => ({
-                      id: session.id,
-                      goal: session.goal,
-                      startTime: session.startTime,
-                      endTime: session.endTime,
-                      duration: session.duration,
-                      status: session.status,
-                      focusScore: session.focusScore,
-                      productivityScore: session.productivityScore
-                    })),
-                    metadata: {
-                      exportFormat: 'OnlyWorks Data Export v1.0',
-                      totalSessionsIncluded: recentSessions.length
-                    }
-                  };
-
-                  // Create a blob and download
-                  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `onlyworks-export-${new Date().toISOString().split('T')[0]}.json`;
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  URL.revokeObjectURL(url);
-
-                  alert('Data exported successfully!');
-                } catch (error) {
-                  console.error('Export failed:', error);
-                  alert('Failed to export data. Please try again.');
-                }
-              }}
-            >
-              Export Data
-            </button>
+            {recentSessions.slice(0, 5).map((session) => (
+              <div
+                key={session.id}
+                className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg"
+              >
+                <div>
+                  <p className="font-medium text-gray-900 dark:text-white">
+                    {session.goal || 'Untitled Session'}
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {formatTimeAgo(session.startTime)} • {formatDuration(session.duration * 1000)}
+                  </p>
+                </div>
+                {session.productivityScore && (
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    {Math.round(session.productivityScore * 10)}%
+                  </span>
+                )}
+              </div>
+            ))}
           </div>
-        </div>
+        ) : (
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            <p>No sessions yet. Start your first session to begin tracking.</p>
+          </div>
+        )}
       </div>
 
-      <InputDialog
-        isOpen={showSessionDialog}
-        onClose={() => setShowSessionDialog(false)}
-        onSubmit={handleSessionSubmit}
-        title="Start New Session"
-        placeholder="Enter your session goal..."
-        submitLabel="Start Session"
-      />
+      {/* Goal Modal */}
+      {showGoalModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-96 max-w-md mx-4">
+            <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+              Start New Session
+            </h2>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Session Name (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={sessionNameInput}
+                  onChange={(e) => setSessionNameInput(e.target.value)}
+                  placeholder="e.g., Morning Development Sprint"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleGoalSubmit();
+                    } else if (e.key === 'Escape') {
+                      handleModalClose();
+                    }
+                  }}
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Focus Goal
+                </label>
+                <input
+                  type="text"
+                  value={goalInput}
+                  onChange={(e) => setGoalInput(e.target.value)}
+                  placeholder="What will you focus on? (e.g., Complete authentication module)"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleGoalSubmit();
+                    } else if (e.key === 'Escape') {
+                      handleModalClose();
+                    }
+                  }}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={handleModalClose}
+                className="px-4 py-2 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleGoalSubmit}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Start Session
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

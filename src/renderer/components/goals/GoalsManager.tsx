@@ -1,81 +1,92 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import GoalCard from './GoalCard';
 import AddGoalForm from './AddGoalForm';
-
-export interface Goal {
-  id: string;
-  title: string;
-  description?: string;
-  targetDate?: Date;
-  progress: number; // 0-100
-  status: 'active' | 'completed' | 'paused';
-  createdAt: Date;
-}
+import { useGoalsStore, Goal } from '../../stores/goalsStore';
 
 interface GoalsManagerProps {
   onGoalsChange?: (goals: Goal[]) => void;
 }
 
 const GoalsManager: React.FC<GoalsManagerProps> = ({ onGoalsChange }) => {
-  const [goals, setGoals] = useState<Goal[]>([]);
+  const { allGoals, addGoal, updateGoal, deleteGoal, saveGoals } = useGoalsStore();
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
 
-  const handleAddGoal = (goalData: Omit<Goal, 'id' | 'createdAt' | 'status' | 'progress'>) => {
-    const newGoal: Goal = {
-      ...goalData,
-      id: `goal-${Date.now()}`,
-      createdAt: new Date(),
-      status: 'active',
-      progress: 0,
-    };
+  // Call onGoalsChange when goals change
+  useEffect(() => {
+    onGoalsChange?.(allGoals);
+  }, [allGoals, onGoalsChange]);
 
-    const updatedGoals = [...goals, newGoal];
-    setGoals(updatedGoals);
+  const handleAddGoal = async (goalData: Omit<Goal, 'id' | 'createdAt' | 'updatedAt'>) => {
+    addGoal({
+      ...goalData,
+      status: goalData.status || 'pending',
+      progress: goalData.progress || 0,
+    });
     setShowAddForm(false);
-    onGoalsChange?.(updatedGoals);
+
+    // Save to backend
+    try {
+      await saveGoals();
+    } catch (error) {
+      console.error('Failed to save goal:', error);
+    }
   };
 
-  const handleEditGoal = (goalData: Omit<Goal, 'id' | 'createdAt' | 'status' | 'progress'>) => {
+  const handleEditGoal = async (goalData: Omit<Goal, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!editingGoal) return;
 
-    const updatedGoals = goals.map((g) =>
-      g.id === editingGoal.id
-        ? { ...g, ...goalData, status: editingGoal.status, progress: editingGoal.progress }
-        : g
-    );
-
-    setGoals(updatedGoals);
+    updateGoal(editingGoal.id, goalData);
     setEditingGoal(null);
     setShowAddForm(false);
-    onGoalsChange?.(updatedGoals);
+
+    // Save to backend
+    try {
+      await saveGoals();
+    } catch (error) {
+      console.error('Failed to save goal updates:', error);
+    }
   };
 
-  const handleDeleteGoal = (id: string) => {
-    const updatedGoals = goals.filter((g) => g.id !== id);
-    setGoals(updatedGoals);
-    onGoalsChange?.(updatedGoals);
+  const handleDeleteGoal = async (id: string) => {
+    deleteGoal(id);
+
+    // Save to backend
+    try {
+      await saveGoals();
+    } catch (error) {
+      console.error('Failed to delete goal:', error);
+    }
   };
 
-  const handleUpdateProgress = (id: string, progress: number) => {
-    const updatedGoals = goals.map((g) =>
-      g.id === id ? { ...g, progress, status: progress >= 100 ? 'completed' : g.status } : g
-    );
-    setGoals(updatedGoals);
-    onGoalsChange?.(updatedGoals);
-  };
-
-  const handleToggleStatus = (id: string) => {
-    const updatedGoals = goals.map((g) => {
-      if (g.id === id) {
-        if (g.status === 'active') return { ...g, status: 'paused' as const };
-        if (g.status === 'paused') return { ...g, status: 'active' as const };
-        return g;
-      }
-      return g;
+  const handleUpdateProgress = async (id: string, progress: number) => {
+    updateGoal(id, {
+      progress,
+      status: progress >= 100 ? 'completed' : progress > 0 ? 'in-progress' : 'pending'
     });
-    setGoals(updatedGoals);
-    onGoalsChange?.(updatedGoals);
+
+    // Save to backend
+    try {
+      await saveGoals();
+    } catch (error) {
+      console.error('Failed to save progress update:', error);
+    }
+  };
+
+  const handleToggleStatus = async (id: string) => {
+    const goal = allGoals.find(g => g.id === id);
+    if (!goal) return;
+
+    let newStatus: 'in-progress' | 'blocked' = goal.status === 'in-progress' ? 'blocked' : 'in-progress';
+
+    updateGoal(id, { status: newStatus });
+
+    // Save to backend
+    try {
+      await saveGoals();
+    } catch (error) {
+      console.error('Failed to save status update:', error);
+    }
   };
 
   const handleEditClick = (goal: Goal) => {
@@ -110,7 +121,7 @@ const GoalsManager: React.FC<GoalsManagerProps> = ({ onGoalsChange }) => {
         />
       )}
 
-      {goals.length === 0 && !showAddForm ? (
+      {allGoals.length === 0 && !showAddForm ? (
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
           <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
             No active goals. Click "+ Add Goal" to get started!
@@ -118,7 +129,7 @@ const GoalsManager: React.FC<GoalsManagerProps> = ({ onGoalsChange }) => {
         </div>
       ) : (
         <div className="space-y-3">
-          {goals.map((goal) => (
+          {allGoals.map((goal) => (
             <GoalCard
               key={goal.id}
               goal={goal}

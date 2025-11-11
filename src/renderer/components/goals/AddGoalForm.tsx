@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
-import type { Goal } from './GoalsManager';
+import type { Goal } from '../../stores/goalsStore';
 
 interface AddGoalFormProps {
   initialData?: Partial<Goal>;
-  onSubmit: (goal: Omit<Goal, 'id' | 'createdAt' | 'status' | 'progress'>) => void;
+  onSubmit: (goal: Omit<Goal, 'id' | 'createdAt' | 'updatedAt'>) => void;
   onCancel: () => void;
 }
 
 const AddGoalForm: React.FC<AddGoalFormProps> = ({ initialData, onSubmit, onCancel }) => {
   const [title, setTitle] = useState(initialData?.title || '');
   const [description, setDescription] = useState(initialData?.description || '');
-  const [targetDate, setTargetDate] = useState(
-    initialData?.targetDate
-      ? new Date(initialData.targetDate).toISOString().split('T')[0]
+  const [type, setType] = useState<Goal['type']>(initialData?.type || 'personal-micro');
+  const [priority, setPriority] = useState<Goal['priority']>(initialData?.priority || 'medium');
+  const [dueDate, setDueDate] = useState(
+    initialData?.dueDate
+      ? new Date(initialData.dueDate).toISOString().split('T')[0]
       : ''
   );
 
@@ -23,13 +25,19 @@ const AddGoalForm: React.FC<AddGoalFormProps> = ({ initialData, onSubmit, onCanc
     onSubmit({
       title: title.trim(),
       description: description.trim() || undefined,
-      targetDate: targetDate ? new Date(targetDate) : undefined,
+      type,
+      priority,
+      status: initialData?.status || 'pending',
+      progress: initialData?.progress || 0,
+      dueDate: dueDate ? new Date(dueDate) : undefined,
     });
 
     // Reset form
     setTitle('');
     setDescription('');
-    setTargetDate('');
+    setType('personal-micro');
+    setPriority('medium');
+    setDueDate('');
   };
 
   return (
@@ -72,15 +80,50 @@ const AddGoalForm: React.FC<AddGoalFormProps> = ({ initialData, onSubmit, onCanc
           />
         </div>
 
-        {/* Target Date */}
+        {/* Type */}
         <div>
           <label className="block text-sm font-medium text-gray-900 dark:text-gray-200 mb-1">
-            Target Date (optional)
+            Goal Type <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value as Goal['type'])}
+            className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+            required
+          >
+            <option value="personal-micro">Personal - Short-term (1-2 weeks)</option>
+            <option value="personal-macro">Personal - Long-term (quarters/year)</option>
+            <option value="team-micro">Team - Sprint/immediate</option>
+            <option value="team-macro">Team - Organizational objectives</option>
+          </select>
+        </div>
+
+        {/* Priority */}
+        <div>
+          <label className="block text-sm font-medium text-gray-900 dark:text-gray-200 mb-1">
+            Priority <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={priority}
+            onChange={(e) => setPriority(e.target.value as Goal['priority'])}
+            className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+            required
+          >
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+
+        {/* Due Date */}
+        <div>
+          <label className="block text-sm font-medium text-gray-900 dark:text-gray-200 mb-1">
+            Due Date (optional)
           </label>
           <input
             type="date"
-            value={targetDate}
-            onChange={(e) => setTargetDate(e.target.value)}
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
             className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
           />
         </div>

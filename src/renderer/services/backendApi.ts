@@ -69,21 +69,28 @@ class BackendApiService {
 
   // Health check
   async healthCheck(): Promise<any> {
-    // Force mock for health check until new backend is ready
+    if (this.useReal && window.api?.healthCheck) {
+      return window.api.healthCheck();
+    }
+
     console.log('[BackendAPI] Mock health check - no backend available');
     return { success: false, error: 'No backend connected' };
   }
 
   // User management
   async getUserProfile(): Promise<any> {
-    // Force mock until new backend is ready
+    if (this.useReal && window.api?.getUserProfile) {
+      return window.api.getUserProfile();
+    }
 
     console.log('[BackendAPI] Mock get user profile - no backend available');
     return { success: false, error: 'No backend connected' };
   }
 
   async updateUserProfile(profileData: any): Promise<any> {
-    // Force mock until new backend is ready
+    if (this.useReal && window.api?.updateUserProfile) {
+      return window.api.updateUserProfile(profileData);
+    }
 
     console.log('[BackendAPI] Mock update user profile - no backend available');
     return { success: false, error: 'No backend connected' };
@@ -91,61 +98,81 @@ class BackendApiService {
 
   // Session management
   async startSession(sessionData: { session_name?: string; goal_description?: string }): Promise<any> {
-    // Force mock until new backend is ready
+    if (this.useReal && window.api?.startSession) {
+      return window.api.startSession(sessionData);
+    }
 
     console.log('[BackendAPI] Mock start session - no backend available');
     return { success: false, error: 'No backend connected' };
   }
 
   async endSession(sessionId: string): Promise<any> {
-    // Force mock until new backend is ready
+    if (this.useReal && window.api?.endSession) {
+      return window.api.endSession(sessionId);
+    }
 
     console.log('[BackendAPI] Mock end session - no backend available');
     return { success: false, error: 'No backend connected' };
   }
 
   async pauseSession(sessionId: string): Promise<any> {
-    // Force mock until new backend is ready
+    if (this.useReal && window.api?.pauseSession) {
+      return window.api.pauseSession(sessionId);
+    }
 
     console.log('[BackendAPI] Mock pause session - no backend available');
     return { success: false, error: 'No backend connected' };
   }
 
   async resumeSession(sessionId: string): Promise<any> {
-    // Force mock until new backend is ready
+    if (this.useReal && window.api?.resumeSession) {
+      return window.api.resumeSession(sessionId);
+    }
 
     console.log('[BackendAPI] Mock resume session - no backend available');
     return { success: false, error: 'No backend connected' };
   }
 
   async getActiveSession(): Promise<any> {
-    // Force mock until new backend is ready
+    if (this.useReal && window.api?.getActiveSession) {
+      return window.api.getActiveSession();
+    }
 
     console.log('[BackendAPI] Mock get active session - no backend available');
     return { success: false, error: 'No backend connected' };
   }
 
   async getUserSessions(options: any = {}): Promise<any> {
-    // Force mock until new backend is ready
+    if (this.useReal && window.api?.getUserSessions) {
+      return window.api.getUserSessions(options);
+    }
 
     console.log('[BackendAPI] Mock get user sessions - no backend available');
     return { success: false, error: 'No backend connected' };
   }
 
   async getSessionById(sessionId: string): Promise<any> {
-    // Force mock until new backend is ready
+    if (this.useReal && window.api?.getSessionById) {
+      return window.api.getSessionById(sessionId);
+    }
 
     console.log('[BackendAPI] Mock get session by ID - no backend available');
     return { success: false, error: 'No backend connected' };
   }
 
   async updateSessionScores(sessionId: string, scores: any): Promise<any> {
+    if (this.useReal && window.api?.updateSessionScores) {
+      return window.api.updateSessionScores(sessionId, scores);
+    }
+
     console.log('[BackendAPI] Mock update session scores - no backend available');
     return { success: false, error: 'No backend connected' };
   }
 
   async getSessionStats(dateFrom?: string, dateTo?: string): Promise<any> {
-    // Force mock until new backend is ready
+    if (this.useReal && window.api?.getSessionStats) {
+      return window.api.getSessionStats(dateFrom, dateTo);
+    }
 
     console.log('[BackendAPI] Mock get session stats - no backend available');
     return { success: false, error: 'No backend connected' };
@@ -175,7 +202,7 @@ class BackendApiService {
         id: 'mock-user-id',
         email: 'test@example.com',
         name: 'Test User',
-        avatar_url: 'https://via.placeholder.com/40',
+        avatar_url: undefined,
         provider: 'google',
       },
     };
@@ -229,7 +256,7 @@ class BackendApiService {
         id: 'mock-user-id',
         email: 'test@example.com',
         name: 'Test User',
-        avatar_url: 'https://via.placeholder.com/40',
+        avatar_url: undefined,
         provider: 'google',
       },
     };
@@ -255,35 +282,45 @@ class BackendApiService {
 
   // Team management
   async createTeam(teamData: { name: string; description?: string }): Promise<any> {
-    // Force mock until new backend is ready
+    if (this.useReal && window.api?.createTeam) {
+      return window.api.createTeam(teamData.name, teamData.description);
+    }
 
     console.log('[BackendAPI] Mock create team - no backend available');
     return { success: false, error: 'No backend connected' };
   }
 
   async getTeams(): Promise<any> {
-    // Force mock until new backend is ready
+    if (this.useReal && window.api?.getTeams) {
+      return window.api.getTeams();
+    }
 
     console.log('[BackendAPI] Mock get teams - no backend available');
     return { success: false, error: 'No backend connected' };
   }
 
   async joinTeam(teamId: string): Promise<any> {
-    // Force mock until new backend is ready
+    if (this.useReal && window.api?.joinTeam) {
+      return window.api.joinTeam(teamId);
+    }
 
     console.log('[BackendAPI] Mock join team - no backend available');
     return { success: false, error: 'No backend connected' };
   }
 
   async leaveTeam(teamId: string): Promise<any> {
-    // Force mock until new backend is ready
+    if (this.useReal && window.api?.leaveTeam) {
+      return window.api.leaveTeam(teamId);
+    }
 
     console.log('[BackendAPI] Mock leave team - no backend available');
     return { success: false, error: 'No backend connected' };
   }
 
   async removeMember(teamId: string, memberId: string): Promise<any> {
-    // Force mock until new backend is ready
+    if (this.useReal && window.api?.removeMember) {
+      return window.api.removeMember(teamId, memberId);
+    }
 
     console.log('[BackendAPI] Mock remove member - no backend available');
     return { success: false, error: 'No backend connected' };
@@ -291,14 +328,18 @@ class BackendApiService {
 
   // Reports
   async generateIndividualReport(timeRange: string): Promise<any> {
-    // Force mock until new backend is ready
+    if (this.useReal && window.api?.generateIndividualReport) {
+      return window.api.generateIndividualReport(timeRange);
+    }
 
     console.log('[BackendAPI] Mock generate individual report - no backend available');
     return { success: false, error: 'No backend connected' };
   }
 
   async generateActivitySummaryReport(timeRange: string): Promise<any> {
-    // Force mock until new backend is ready
+    if (this.useReal && window.api?.generateActivitySummaryReport) {
+      return window.api.generateActivitySummaryReport(timeRange);
+    }
 
     console.log('[BackendAPI] Mock generate activity summary report - no backend available');
     return { success: false, error: 'No backend connected' };

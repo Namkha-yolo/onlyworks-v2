@@ -5,27 +5,90 @@ import TopBar from './components/layout/TopBar';
 import Dashboard from './pages/Dashboard';
 import Workspace from './pages/Workspace';
 import Sessions from './pages/Sessions';
+import Analytics from './pages/Analytics';
 import Reports from './pages/Reports';
+import Goals from './pages/Goals';
 import Welcome from './pages/Welcome';
 import SettingsSidebar from './components/modals/SettingsSidebar';
 import AuthGuard from './components/auth/AuthGuard';
-import SecureApiDemo from './components/SecureApiDemo';
 import { useThemeStore } from './stores/themeStore';
 import { useAuthStore } from './stores/authStore';
+import { useSessionStore } from './stores/sessionStore';
+import { initializeGoalsFromBackend } from './stores/goalsStore';
 
-type Page = 'dashboard' | 'workspace' | 'sessions' | 'reports' | 'api-demo';
+type Page = 'dashboard' | 'workspace' | 'sessions' | 'analytics' | 'reports' | 'goals';
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const initializeTheme = useThemeStore((state) => state.initializeTheme);
   const initializeAuth = useAuthStore((state) => state.initializeAuth);
+  const clearLingeringActiveSessions = useSessionStore((state) => state.clearLingeringActiveSessions);
   const { isAuthenticated, isLoading } = useAuthStore();
 
   useEffect(() => {
     initializeTheme();
     initializeAuth();
   }, [initializeTheme, initializeAuth]);
+
+  // Track clicks for screenshot capture
+  useEffect(() => {
+    const handleClick = (event: MouseEvent) => {
+      // Send click event with position to main process
+      // @ts-ignore
+      if (window.electronAPI && window.electronAPI.send) {
+        // @ts-ignore
+        window.electronAPI.send('screenshot:mouse-click', {
+          x: event.clientX,
+          y: event.clientY
+        });
+      }
+    };
+
+    // Track keyboard events
+    const handleKeyPress = (event: KeyboardEvent) => {
+      if (event.key === 'Enter') {
+        // @ts-ignore
+        if (window.electronAPI && window.electronAPI.send) {
+          // @ts-ignore
+          window.electronAPI.send('screenshot:key-enter');
+        }
+      }
+      // Track Cmd+C and Cmd+V
+      if ((event.metaKey || event.ctrlKey) && event.key === 'c') {
+        // @ts-ignore
+        if (window.electronAPI && window.electronAPI.send) {
+          // @ts-ignore
+          window.electronAPI.send('screenshot:cmd-c');
+        }
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key === 'v') {
+        // @ts-ignore
+        if (window.electronAPI && window.electronAPI.send) {
+          // @ts-ignore
+          window.electronAPI.send('screenshot:cmd-v');
+        }
+      }
+    };
+
+    // Add event listeners
+    document.addEventListener('click', handleClick);
+    document.addEventListener('keydown', handleKeyPress);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('click', handleClick);
+      document.removeEventListener('keydown', handleKeyPress);
+    };
+  }, []);
+
+  // Load goals and cleanup sessions after authentication is complete
+  useEffect(() => {
+    if (isAuthenticated && !isLoading) {
+      initializeGoalsFromBackend();
+      clearLingeringActiveSessions();
+    }
+  }, [isAuthenticated, isLoading, clearLingeringActiveSessions]);
 
   const renderPage = () => {
     switch (currentPage) {
@@ -35,10 +98,12 @@ const App: React.FC = () => {
         return <Workspace />;
       case 'sessions':
         return <Sessions />;
+      case 'analytics':
+        return <Analytics />;
       case 'reports':
         return <Reports />;
-      case 'api-demo':
-        return <SecureApiDemo />;
+      case 'goals':
+        return <Goals />;
       default:
         return <Dashboard />;
     }

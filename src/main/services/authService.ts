@@ -61,27 +61,16 @@ export class AuthService {
 
   async initOAuth(provider: string): Promise<string> {
     try {
-      console.log('[AuthService] Initiating OAuth for provider:', provider, 'via server:', this.serverUrl);
+      console.log('[AuthService] Initiating OAuth for provider:', provider, 'via backend API');
 
-      const response = await fetch(`${this.serverUrl}/api/auth/oauth/${provider}/init`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await this.backendApi.get(`/api/auth/oauth/${provider}/init`);
 
-      if (!response.ok) {
-        throw new Error(`OAuth init failed: ${response.status} ${response.statusText}`);
+      if (!response.success) {
+        throw new Error(response.error?.message || 'OAuth initialization failed');
       }
 
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.error?.message || 'OAuth initialization failed');
-      }
-
-      console.log('[AuthService] OAuth URL generated:', data.data.auth_url);
-      return data.data.auth_url;
+      console.log('[AuthService] OAuth URL generated:', response.data.auth_url);
+      return response.data.auth_url;
     } catch (error) {
       console.error('OAuth initialization error:', error);
       throw error;
@@ -272,33 +261,19 @@ export class AuthService {
           console.log('[AuthService] Authorization code received, exchanging with server...');
 
           try {
-            const response = await fetch(`${this.serverUrl}/api/auth/oauth/google/callback`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                code,
-                state: urlObj.searchParams.get('state')
-              }),
+            const response = await this.backendApi.post('/api/auth/oauth/google/callback', {
+              code,
+              state: urlObj.searchParams.get('state')
             });
 
-            if (!response.ok) {
-              const errorText = await response.text();
-              console.error('[AuthService] Server code exchange failed:', response.status, response.statusText, errorText);
+            if (!response.success) {
+              console.error('[AuthService] Server code exchange error:', response.error);
               this.safeCloseWindow(authWindow);
               resolve(null);
               return;
             }
 
-            const data = await response.json();
-
-            if (!data.success) {
-              console.error('[AuthService] Server code exchange error:', data.error);
-              this.safeCloseWindow(authWindow);
-              resolve(null);
-              return;
-            }
+            const data = response;
 
             const session: AuthSession = {
               access_token: data.data.token,
@@ -381,27 +356,18 @@ export class AuthService {
 
   async refreshAuthToken(refreshToken: string): Promise<AuthSession | null> {
     try {
-      console.log('[AuthService] Refreshing auth token via server...');
+      console.log('[AuthService] Refreshing auth token via backend API...');
 
-      const response = await fetch(`${this.serverUrl}/api/auth/refresh`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ refresh_token: refreshToken }),
+      const response = await this.backendApi.post('/api/auth/refresh', {
+        refresh_token: refreshToken
       });
 
-      if (!response.ok) {
-        console.error('[AuthService] Token refresh failed:', response.status, response.statusText);
+      if (!response.success) {
+        console.error('[AuthService] Token refresh failed:', response.error);
         return null;
       }
 
-      const data = await response.json();
-
-      if (!data.success) {
-        console.error('[AuthService] Token refresh failed:', data.error);
-        return null;
-      }
+      const data = response;
 
       const session: AuthSession = {
         access_token: data.data.access_token,
@@ -433,30 +399,17 @@ export class AuthService {
       }
 
       // Validate with server
-      const response = await fetch(`${this.serverUrl}/api/auth/validate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ access_token: session.access_token }),
+      this.backendApi.setAuthToken(session.access_token);
+      const response = await this.backendApi.post('/api/auth/validate', {
+        access_token: session.access_token
       });
 
-      if (!response.ok) {
-        console.log('[AuthService] Session validation failed:', response.status, response.statusText);
-        return false;
-      }
-
-      const data = await response.json();
-
-      if (data.success) {
+      if (response.success) {
         console.log('[AuthService] Session validated successfully');
-        // Set auth token in backend API service for API calls
-        this.backendApi.setAuthToken(session.access_token);
         return true;
       }
 
-      console.log('[AuthService] Session validation failed - server returned error:', data.error);
+      console.log('[AuthService] Session validation failed - server returned error:', response.error);
       return false;
     } catch (error) {
       console.error('Session validation error:', error);
