@@ -10,12 +10,12 @@ export interface ProductivityRecommendation {
 }
 
 export interface AIInsights {
-  productivity_score: number;
+  productivity_score: number | null;
   working_style: string;
   efficiency_trends: string;
   optimal_hours: string[];
   break_suggestions: string[];
-  session_length_recommendation: number;
+  session_length_recommendation: number | null;
   ai_recommendations: string[];
   generated_at?: string;
 }
@@ -64,6 +64,33 @@ export const calculateInsightsWithAI = async (
   sessions: Session[],
   goals: Goal[] = []
 ): Promise<ProductivityInsights> => {
+  // If no sessions, return empty state
+  if (!sessions || sessions.length === 0) {
+    return {
+      peakHours: '--',
+      focusScoreWeekly: 0,
+      goalAchievement: { completed: 0, total: goals.length },
+      recommendations: [{
+        type: 'session',
+        title: 'Getting Started',
+        message: 'Start tracking your work sessions to receive personalized productivity insights and recommendations.',
+        color: 'bg-gray-50 dark:bg-gray-700 border-gray-300',
+        source: 'rule-based',
+      }],
+      aiInsights: {
+        productivity_score: null,
+        working_style: 'No data available',
+        efficiency_trends: 'Start tracking sessions to see trends',
+        optimal_hours: [],
+        break_suggestions: ['Start tracking sessions to get personalized break recommendations'],
+        session_length_recommendation: null,
+        ai_recommendations: [],
+        generated_at: new Date().toISOString()
+      },
+      isAiEnabled: false,
+    };
+  }
+
   try {
     // Get AI insights from main process (via IPC)
     const aiInsights = await requestAIAnalysis(sessions, goals);
@@ -163,8 +190,8 @@ const generateHybridRecommendations = (
 ): ProductivityRecommendation[] => {
   const recommendations: ProductivityRecommendation[] = [];
 
-  // AI-powered recommendations (if available)
-  if (aiInsights && aiInsights.ai_recommendations.length > 0) {
+  // AI-powered recommendations (if available and not null)
+  if (aiInsights && aiInsights.productivity_score !== null && aiInsights.ai_recommendations.length > 0) {
     aiInsights.ai_recommendations.slice(0, 2).forEach((rec, index) => {
       recommendations.push({
         type: 'ai',

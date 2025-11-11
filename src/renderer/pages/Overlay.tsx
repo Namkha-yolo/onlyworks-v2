@@ -99,7 +99,7 @@ const Overlay: React.FC = () => {
   }, [setEdge]);
 
   // Memoized handlers
-  const handleStart = useCallback(() => startSession('Quick Session'), [startSession]);
+  const handleStart = useCallback(() => startSession('Quick Session', 'Quick Focus'), [startSession]);
   const handlePauseResume = useCallback(() => {
     activeSession?.status === 'active' ? pauseSession() : resumeSession();
   }, [activeSession, pauseSession, resumeSession]);

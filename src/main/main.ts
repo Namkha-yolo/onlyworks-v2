@@ -589,7 +589,10 @@ class OnlyWorksApp {
         // Store the analysis result in the backend
         if (result) {
           await this.backendApi.saveSessionAnalysis(context.session.id, {
-            ...result,
+            productivity_score: result.productivity_score,
+            focus_patterns: result.focus_patterns,
+            recommendations: result.recommendations,
+            insights: result.insights,
             ai_provider: 'gemini',
             analysis_type: 'session_complete'
           });
@@ -658,14 +661,33 @@ class OnlyWorksApp {
         const recommendations = await this.aiAnalysisService.generateRecommendations(sessions, goals);
         const patterns = await this.aiAnalysisService.analyzeWorkingPatterns(sessions);
 
+        // Only return data if we have actual sessions to analyze
+        if (!sessions || sessions.length === 0) {
+          return {
+            productivity_score: null,
+            working_style: 'No data available',
+            efficiency_trends: 'Start tracking sessions to see trends',
+            optimal_hours: [],
+            break_suggestions: [],
+            session_length_recommendation: null,
+            ai_recommendations: [],
+            generated_at: new Date().toISOString()
+          };
+        }
+
+        // Calculate actual productivity score from sessions
+        const productivityScore = sessions.length > 0
+          ? Math.round(sessions.reduce((sum: number, s: any) => sum + (s.focusScore || 0), 0) / sessions.length)
+          : null;
+
         return {
-          productivity_score: 75, // Could be calculated from recent sessions
-          working_style: 'Focused with regular breaks',
-          efficiency_trends: 'Improving over time',
-          optimal_hours: patterns.optimal_hours,
-          break_suggestions: patterns.break_suggestions,
-          session_length_recommendation: patterns.session_length_recommendation,
-          ai_recommendations: recommendations,
+          productivity_score: productivityScore,
+          working_style: productivityScore ? 'Focused with regular breaks' : 'No data available',
+          efficiency_trends: productivityScore ? 'Improving over time' : 'Start tracking sessions to see trends',
+          optimal_hours: patterns.optimal_hours || [],
+          break_suggestions: patterns.break_suggestions || [],
+          session_length_recommendation: patterns.session_length_recommendation || null,
+          ai_recommendations: recommendations || [],
           generated_at: new Date().toISOString()
         };
       } catch (error) {

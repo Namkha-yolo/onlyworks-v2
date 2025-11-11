@@ -385,23 +385,33 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   getRecentSessions: async () => {
     try {
+      console.log('[SessionStore] getRecentSessions called...');
       const response = await backendApi.getUserSessions({ limit: 10 });
+      console.log('[SessionStore] getUserSessions response:', response);
 
       if (response.success && response.data && response.data.sessions && response.data.sessions.length > 0) {
         const sessions: Session[] = response.data.sessions.map((session: any) => ({
           id: session.id,
-          goal: session.goal_description || session.session_name || 'Work Session',
+          sessionName: session.session_name || 'Work Session',
+          goal: session.goal_description || 'General Focus',
           startTime: new Date(session.start_time),
           endTime: session.end_time ? new Date(session.end_time) : undefined,
           duration: session.duration_minutes ? session.duration_minutes * 60 : 0,
           status: session.status === 'active' ? 'active' : session.status === 'paused' ? 'paused' : 'completed',
           productivityScore: session.productivity_score,
           focusScore: session.focus_score,
+          report: session.report ? session.report : undefined,
         }));
 
+        console.log('[SessionStore] Mapped sessions:', sessions.length, 'sessions');
+        console.log('[SessionStore] Session details:', sessions);
         set({ recentSessions: sessions });
+        console.log('[SessionStore] State updated with sessions');
+      } else if (response.success) {
+        console.log('No recent sessions found in backend');
+        set({ recentSessions: [] });
       } else {
-        console.warn('Failed to fetch recent sessions from backend');
+        console.warn('Failed to fetch recent sessions from backend:', response.error?.message);
         set({ recentSessions: [] });
       }
     } catch (error) {

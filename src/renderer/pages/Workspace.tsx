@@ -94,7 +94,7 @@ const PersonalTab: React.FC = () => {
   };
 
   const handleSessionSubmit = (goal: string) => {
-    startSession(goal);
+    startSession('Work Session', goal);
   };
 
   return (

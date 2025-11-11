@@ -11,7 +11,7 @@ import {
 // Legacy interface for backward compatibility
 export interface AIAnalysisResult {
   sessionId: string;
-  productivity_score: number;
+  productivity_score: number | null;
   focus_patterns: {
     peak_hours: string[];
     distraction_frequency: number;
@@ -908,21 +908,21 @@ Base recommendations on focus patterns and productivity data.`;
   private getFallbackAnalysis(sessionId: string): AIAnalysisResult {
     return {
       sessionId,
-      productivity_score: 75,
+      productivity_score: null,
       focus_patterns: {
-        peak_hours: ['9', '10', '14'],
-        distraction_frequency: 2,
-        deep_focus_duration: 30
+        peak_hours: [],
+        distraction_frequency: 0,
+        deep_focus_duration: 0
       },
       recommendations: {
-        immediate: ['Consider taking a short break before your next session'],
-        weekly: ['Try to maintain consistent work hours'],
-        habit_suggestions: ['Use time-blocking for similar tasks']
+        immediate: ['Start a work session to receive personalized recommendations'],
+        weekly: [],
+        habit_suggestions: []
       },
       insights: {
-        working_style: 'Developing consistent patterns',
-        efficiency_trends: 'Building momentum',
-        goal_alignment: 'Making progress toward objectives'
+        working_style: 'No data available',
+        efficiency_trends: 'Start tracking sessions to see trends',
+        goal_alignment: 'Set up goals to track alignment'
       },
       generated_at: new Date().toISOString()
     };

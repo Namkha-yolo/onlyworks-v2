@@ -48,7 +48,7 @@ const Overlay: React.FC = () => {
   };
 
   const handleStart = () => {
-    startSession('Quick Session');
+    startSession('Quick Session', 'Quick Focus');
   };
 
   const handlePauseResume = () => {

@@ -23,7 +23,7 @@ const Sessions: React.FC = () => {
   const handleStartSession = () => {
     const goal = prompt('What will you focus on?');
     if (goal) {
-      startSession(goal);
+      startSession('Work Session', goal);
     }
   };
 

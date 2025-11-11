@@ -20,9 +20,15 @@ const Reports: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    console.log('[Reports] useEffect triggered, calling getRecentSessions...');
     getRecentSessions();
     getTodayStats();
   }, [getRecentSessions, getTodayStats]);
+
+  useEffect(() => {
+    console.log('[Reports] recentSessions updated:', recentSessions?.length || 0, 'sessions');
+    console.log('[Reports] recentSessions data:', recentSessions);
+  }, [recentSessions]);
 
   const calculateReportData = (): ReportData => {
     const now = new Date();
@@ -64,6 +70,8 @@ const Reports: React.FC = () => {
         avgFocusScore: todayStats.focusScore,
         productivity,
         productivityChange: 5, // Default mock change
+        sessionsWithReports: 0,
+        latestReport: undefined,
       };
     }
 

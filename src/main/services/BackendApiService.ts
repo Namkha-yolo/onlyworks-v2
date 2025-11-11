@@ -416,7 +416,7 @@ export class BackendApiService {
 
   // AI Analysis endpoints
   async saveSessionAnalysis(sessionId: string, analysisData: {
-    productivity_score: number;
+    productivity_score: number | null;
     focus_patterns: any;
     recommendations: any;
     insights: any;
