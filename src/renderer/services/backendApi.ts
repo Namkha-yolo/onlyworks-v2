@@ -19,7 +19,7 @@ export interface BackendAPI {
 
   // Session management
   startSession: (sessionData: { session_name?: string; goal_description?: string }) => Promise<any>;
-  endSession: (sessionId: string) => Promise<any>;
+  endSession: (sessionId: string, endData?: any) => Promise<any>;
   pauseSession: (sessionId: string) => Promise<any>;
   resumeSession: (sessionId: string) => Promise<any>;
   getActiveSession: () => Promise<any>;
@@ -106,9 +106,9 @@ class BackendApiService {
     return { success: false, error: 'No backend connected' };
   }
 
-  async endSession(sessionId: string): Promise<any> {
+  async endSession(sessionId: string, endData?: any): Promise<any> {
     if (this.useReal && window.api?.endSession) {
-      return window.api.endSession(sessionId);
+      return window.api.endSession(sessionId, endData);
     }
 
     console.log('[BackendAPI] Mock end session - no backend available');

@@ -1,6 +1,7 @@
 import { screen, desktopCapturer, BrowserWindow, ipcMain, globalShortcut } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
+import { uIOhook, UiohookKey } from 'uiohook-napi';
 import { ScreenshotData, AnalysisContext, AnalysisRequest, OnlyWorksAIAnalysis } from '../../shared/types/analysis';
 import { ScreenshotSupabaseService } from './ScreenshotSupabaseService';
 import { LocalScreenshotService } from './LocalScreenshotService';
@@ -67,6 +68,7 @@ export class ScreenshotAnalysisService {
     teamMicro: [],
     teamMacro: []
   };
+  private globalEventListenersActive: boolean = false;
 
   private constructor() {
     this.supabaseService = new ScreenshotSupabaseService();
@@ -135,6 +137,7 @@ export class ScreenshotAnalysisService {
     // Enable event-based triggers
     if (captureOptions.enableEventTriggers) {
       this.enableEventTriggers(captureOptions);
+      this.enableGlobalEventTriggers(captureOptions);
     }
     // Clear session analyses for new session
     this.sessionAnalyses = [];
@@ -186,6 +189,15 @@ export class ScreenshotAnalysisService {
 
     // Upload any remaining screenshots
     await this.processUploadQueue(1); // Force upload all remaining
+
+    // For short sessions with minimal screenshots, force analysis even with few screenshots
+    if (this.currentSession) {
+      const currentSessionScreenshots = this.screenshots.filter(s => s.sessionId === this.currentSession);
+      if (currentSessionScreenshots.length >= 2 && this.analysisCounter === 0) {
+        console.log(`[ScreenshotAnalysisService] Forcing analysis for short session with ${currentSessionScreenshots.length} screenshots`);
+        await this.analyzeScreenshotBatch(currentSessionScreenshots);
+      }
+    }
 
     // Generate final analysis for remaining screenshots
     await this.generateFinalSessionAnalysis();
@@ -526,12 +538,121 @@ export class ScreenshotAnalysisService {
   }
 
   /**
+   * Enable global event triggers using uiohook-napi for system-wide monitoring
+   */
+  private enableGlobalEventTriggers(options: CaptureOptions): void {
+    if (this.globalEventListenersActive) {
+      console.log('[ScreenshotAnalysisService] Global event listeners already active');
+      return;
+    }
+
+    try {
+      console.log('[ScreenshotAnalysisService] 🌐 ENABLING GLOBAL EVENT TRIGGERS');
+      console.log('[ScreenshotAnalysisService] Monitoring system-wide: mouse clicks, key presses');
+
+      // Mouse click events
+      uIOhook.on('click', async (event) => {
+        if (this.isCapturing && this.globalEventListenersActive) {
+          console.log(`[ScreenshotAnalysisService] 🌐🖱️ GLOBAL CLICK DETECTED at (${event.x}, ${event.y})`);
+          const screenshot = await this.captureScreenshot(
+            options,
+            {
+              triggerType: 'click',
+              eventDetails: {
+                timestamp: Date.now(),
+                clickPosition: { x: event.x, y: event.y },
+                button: event.button,
+                global: true
+              },
+              mousePosition: { x: event.x, y: event.y }
+            }
+          );
+          if (screenshot) {
+            console.log(`[ScreenshotAnalysisService] ✅ Global click screenshot captured at (${event.x}, ${event.y})`);
+          }
+        }
+      });
+
+      // Key press events (for specific keys like Enter)
+      uIOhook.on('keydown', async (event) => {
+        if (this.isCapturing && this.globalEventListenersActive) {
+          // Capture on Enter key
+          if (event.keycode === UiohookKey.Enter) {
+            console.log('[ScreenshotAnalysisService] 🌐⌨️ GLOBAL ENTER KEY DETECTED');
+            const screenshot = await this.captureScreenshot(
+              options,
+              {
+                triggerType: 'enter_key',
+                eventDetails: { timestamp: Date.now(), global: true }
+              }
+            );
+            if (screenshot) {
+              console.log('[ScreenshotAnalysisService] ✅ Global Enter key screenshot captured');
+            }
+          }
+
+          // Capture on Ctrl/Cmd + C (Copy)
+          if ((event.ctrlKey || event.metaKey) && event.keycode === UiohookKey.C) {
+            console.log('[ScreenshotAnalysisService] 🌐📋 GLOBAL COPY DETECTED');
+            await this.captureScreenshot(
+              options,
+              {
+                triggerType: 'cmd_c',
+                eventDetails: { timestamp: Date.now(), action: 'copy', global: true }
+              }
+            );
+          }
+
+          // Capture on Ctrl/Cmd + V (Paste)
+          if ((event.ctrlKey || event.metaKey) && event.keycode === UiohookKey.V) {
+            console.log('[ScreenshotAnalysisService] 🌐📋 GLOBAL PASTE DETECTED');
+            await this.captureScreenshot(
+              options,
+              {
+                triggerType: 'cmd_v',
+                eventDetails: { timestamp: Date.now(), action: 'paste', global: true }
+              }
+            );
+          }
+        }
+      });
+
+      // Start the global hook
+      uIOhook.start();
+      this.globalEventListenersActive = true;
+
+      console.log('[ScreenshotAnalysisService] ✅ Global event monitoring started successfully');
+      console.log('[ScreenshotAnalysisService] Now capturing: system-wide clicks, Enter, Ctrl/Cmd+C, Ctrl/Cmd+V');
+
+    } catch (error) {
+      console.error('[ScreenshotAnalysisService] Failed to start global event monitoring:', error);
+      console.log('[ScreenshotAnalysisService] Falling back to app-only event detection');
+    }
+  }
+
+  /**
    * Disable event-based triggers
    */
   private disableEventTriggers(): void {
     this.eventListenersActive = false;
     globalShortcut.unregisterAll();
+    this.disableGlobalEventTriggers();
     console.log('[ScreenshotAnalysisService] Event triggers disabled');
+  }
+
+  /**
+   * Disable global event triggers
+   */
+  private disableGlobalEventTriggers(): void {
+    if (this.globalEventListenersActive) {
+      try {
+        uIOhook.stop();
+        this.globalEventListenersActive = false;
+        console.log('[ScreenshotAnalysisService] 🌐❌ Global event monitoring stopped');
+      } catch (error) {
+        console.warn('[ScreenshotAnalysisService] Error stopping global event monitoring:', error);
+      }
+    }
   }
 
   /**
@@ -665,22 +786,33 @@ export class ScreenshotAnalysisService {
   }
 
   /**
-   * Check if we should trigger analysis (every 30 screenshots for current session)
+   * Check if we should trigger analysis (adaptive threshold based on session length)
    */
   private async checkForAnalysisTrigger(): Promise<void> {
     if (!this.currentSession) return;
 
     const currentSessionScreenshots = this.screenshots.filter(s => s.sessionId === this.currentSession);
-    const analysisThreshold = 30; // Process 30 screenshots at a time (approximately 2.5 minutes at 5-second intervals)
+
+    // Use adaptive threshold: smaller batches for shorter sessions
+    let analysisThreshold: number;
+    if (currentSessionScreenshots.length <= 10) {
+      analysisThreshold = 5; // Analyze with just 5 screenshots for short sessions
+    } else if (currentSessionScreenshots.length <= 20) {
+      analysisThreshold = 10; // 10 screenshots for medium sessions
+    } else {
+      analysisThreshold = 20; // 20 screenshots for longer sessions (reduced from 30)
+    }
+
+    console.log(`[ScreenshotAnalysisService] Analysis threshold for ${currentSessionScreenshots.length} screenshots: ${analysisThreshold}`);
 
     // Check if we have enough new screenshots for analysis
-    const screenshotsAnalyzed = this.analysisCounter * analysisThreshold;
+    const screenshotsAnalyzed = this.analysisCounter * (this.analysisCounter === 0 ? analysisThreshold : 20); // Use current threshold for first batch
     const screenshotsAvailable = currentSessionScreenshots.length;
 
     if (screenshotsAvailable >= screenshotsAnalyzed + analysisThreshold) {
-      console.log(`[ScreenshotAnalysisService] Triggering analysis #${this.analysisCounter + 1} at ${screenshotsAvailable} screenshots`);
+      console.log(`[ScreenshotAnalysisService] Triggering analysis #${this.analysisCounter + 1} at ${screenshotsAvailable} screenshots (threshold: ${analysisThreshold})`);
 
-      // Get the next 30 screenshots for analysis
+      // Get the next batch of screenshots for analysis
       const batchStart = screenshotsAnalyzed;
       const batchEnd = batchStart + analysisThreshold;
       const screenshotBatch = currentSessionScreenshots.slice(batchStart, batchEnd);
@@ -690,7 +822,7 @@ export class ScreenshotAnalysisService {
   }
 
   /**
-   * Analyze a batch of 10 screenshots immediately
+   * Analyze a batch of screenshots immediately (adaptive batch size)
    */
   private async analyzeScreenshotBatch(screenshots: ScreenshotData[]): Promise<void> {
     if (!this.currentSession) return;
@@ -752,12 +884,26 @@ export class ScreenshotAnalysisService {
     if (!this.currentSession) return;
 
     const currentSessionScreenshots = this.screenshots.filter(s => s.sessionId === this.currentSession);
-    const screenshotsAnalyzed = this.analysisCounter * 30; // Updated to match new batch size
+
+    // Calculate screenshots already analyzed (use flexible batch sizes)
+    let screenshotsAnalyzed = 0;
+    for (let i = 0; i < this.analysisCounter; i++) {
+      if (i === 0 && currentSessionScreenshots.length <= 10) {
+        screenshotsAnalyzed += 5; // First batch was 5 for short sessions
+      } else if (i === 0 && currentSessionScreenshots.length <= 20) {
+        screenshotsAnalyzed += 10; // First batch was 10 for medium sessions
+      } else {
+        screenshotsAnalyzed += 20; // Default batch size
+      }
+    }
+
     const remainingScreenshots = currentSessionScreenshots.slice(screenshotsAnalyzed);
 
     if (remainingScreenshots.length > 0) {
       console.log(`[ScreenshotAnalysisService] Generating final analysis for ${remainingScreenshots.length} remaining screenshots`);
       await this.analyzeScreenshotBatch(remainingScreenshots);
+    } else {
+      console.log(`[ScreenshotAnalysisService] No remaining screenshots for final analysis (${screenshotsAnalyzed}/${currentSessionScreenshots.length} analyzed)`);
     }
   }
 
@@ -948,28 +1094,28 @@ Focus on creating a report that tells the complete story of this work session.`;
         trigger_breakdown: this.analyzeTriggerBreakdown(screenshots)
       };
 
-      console.log(`[ScreenshotAnalysisService] Storing batch analysis #${this.analysisCounter} in database`);
+      console.log(`[ScreenshotAnalysisService] Triggering backend batch processing for analysis #${this.analysisCounter}`);
 
       try {
-        // Store via backend API
-        const response = await fetch('http://localhost:8080/api/analysis/batch', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(batchData)
+        // Trigger backend batch processing instead of storing custom analysis
+        const { BackendApiService } = await import('./BackendApiService');
+        const backendApi = BackendApiService.getInstance();
+
+        const response = await backendApi.triggerBatchProcessing(this.currentSession!, {
+          batchSize: screenshots.length,
+          analysisType: 'standard'
         });
 
-        if (response.ok) {
-          const result = await response.json();
-          console.log(`[ScreenshotAnalysisService] Batch analysis stored successfully:`, result.data);
+        if (response.success) {
+          console.log(`[ScreenshotAnalysisService] Backend batch processing triggered successfully:`, response.data);
+          // Store our local analysis for future reference
+          this.storeAnalysisLocally('batch', batchData);
         } else {
-          const error = await response.json();
-          console.warn(`[ScreenshotAnalysisService] Backend storage failed:`, error);
+          console.warn(`[ScreenshotAnalysisService] Backend batch processing failed:`, response.error);
           this.storeAnalysisLocally('batch', batchData);
         }
       } catch (networkError: any) {
-        console.warn(`[ScreenshotAnalysisService] Backend not available, storing locally:`, networkError?.message || networkError);
+        console.warn(`[ScreenshotAnalysisService] Backend batch processing not available, storing locally:`, networkError?.message || networkError);
         this.storeAnalysisLocally('batch', batchData);
       }
 

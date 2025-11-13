@@ -261,10 +261,7 @@ export class AuthService {
           console.log('[AuthService] Authorization code received, exchanging with server...');
 
           try {
-            const response = await this.backendApi.post('/api/auth/oauth/google/callback', {
-              code,
-              state: urlObj.searchParams.get('state')
-            });
+            const response = await this.backendApi.get(`/api/auth/oauth/google/callback?code=${code}&state=${urlObj.searchParams.get('state')}`);
 
             if (!response.success) {
               console.error('[AuthService] Server code exchange error:', response.error);
@@ -276,15 +273,15 @@ export class AuthService {
             const data = response;
 
             const session: AuthSession = {
-              access_token: data.data.token,
+              access_token: data.data.access_token,
               refresh_token: data.data.refresh_token || '',
-              expires_at: data.data.expiresIn ? Date.now() + (data.data.expiresIn * 1000) : Date.now() + 3600000,
+              expires_at: data.data.expires_in ? Date.now() + (data.data.expires_in * 1000) : Date.now() + 3600000,
               user: {
                 id: data.data.user.id,
                 email: data.data.user.email,
                 name: data.data.user.name || data.data.user.email,
-                avatar_url: data.data.user.avatar || data.data.user.avatar_url,
-                provider: 'google'
+                avatar_url: data.data.user.avatar_url,
+                provider: data.data.user.provider || 'google'
               }
             };
 

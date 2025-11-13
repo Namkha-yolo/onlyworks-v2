@@ -13,7 +13,8 @@ export class CaptureService {
   private uploadService: ScreenshotUploadService;
   private currentSessionId: string | null = null;
   private captureInterval: NodeJS.Timeout | null = null;
-  private captureFrequency = 15000; // 15 seconds default
+  private captureFrequency = 5000; // 5 seconds default
+  private clickCaptureEnabled = true;
 
   constructor(dataPath: string) {
     this.screenshotsDir = path.join(dataPath, 'screenshots');
@@ -44,9 +45,18 @@ export class CaptureService {
     console.log('Screenshot monitoring started for session:', sessionId);
 
     if (this.uiohook) {
-      // Mouse events
-      this.uiohook.on('click', () => {
+      // Mouse events - capture screenshot on click
+      this.uiohook.on('click', async () => {
         this.notifyActivity('click');
+
+        // Capture screenshot on click if enabled
+        if (this.clickCaptureEnabled && this.currentSessionId) {
+          try {
+            await this.captureScreenWithTrigger('click');
+          } catch (error) {
+            console.error('Failed to capture screenshot on click:', error);
+          }
+        }
       });
 
       // Keyboard events
@@ -73,6 +83,66 @@ export class CaptureService {
 
     if (this.uiohook) {
       this.uiohook.stop();
+    }
+  }
+
+  async captureScreenWithTrigger(trigger: string): Promise<Screenshot> {
+    try {
+      const displays = screen.getAllDisplays();
+      const primaryDisplay = displays.find(display => display.bounds.x === 0 && display.bounds.y === 0) || displays[0];
+
+      const sources = await desktopCapturer.getSources({
+        types: ['screen'],
+        thumbnailSize: {
+          width: primaryDisplay.size.width,
+          height: primaryDisplay.size.height
+        }
+      });
+
+      if (sources.length === 0) {
+        throw new Error('No screen sources available');
+      }
+
+      const source = sources[0];
+      const timestamp = Date.now();
+      const id = uuidv4();
+      const filename = `screenshot_${timestamp}.png`;
+      const filePath = path.join(this.screenshotsDir, filename);
+
+      // Convert thumbnail to buffer and save
+      const buffer = source.thumbnail.toPNG();
+      fs.writeFileSync(filePath, buffer);
+
+      const screenshot: Screenshot = {
+        id,
+        sessionId: this.currentSessionId || '',
+        filePath,
+        timestamp,
+        metadata: {
+          screenSize: {
+            width: primaryDisplay.size.width,
+            height: primaryDisplay.size.height
+          }
+        }
+      };
+
+      console.log(`Screenshot captured (${trigger}): ${filename}`);
+
+      // Upload screenshot if session is active
+      if (this.currentSessionId && this.isMonitoring) {
+        this.uploadService.queueScreenshot({
+          sessionId: this.currentSessionId,
+          filePath,
+          timestamp,
+          captureTriger: trigger
+        });
+      }
+
+      return screenshot;
+
+    } catch (error) {
+      console.error('Failed to capture screenshot:', error);
+      throw error;
     }
   }
 
@@ -124,7 +194,7 @@ export class CaptureService {
           sessionId: this.currentSessionId,
           filePath,
           timestamp,
-          captureTriger: 'timer_15s'
+          captureTriger: 'timer_5s'
         });
       }
 
@@ -164,7 +234,7 @@ export class CaptureService {
     this.captureInterval = setInterval(async () => {
       if (this.isMonitoring && this.currentSessionId) {
         try {
-          await this.captureScreen();
+          await this.captureScreenWithTrigger('timer_5s');
         } catch (error) {
           console.error('Automatic screenshot capture failed:', error);
         }
@@ -202,6 +272,15 @@ export class CaptureService {
 
   isUploadInProgress(): boolean {
     return this.uploadService.isUploadInProgress();
+  }
+
+  setClickCaptureEnabled(enabled: boolean): void {
+    this.clickCaptureEnabled = enabled;
+    console.log(`Click capture ${enabled ? 'enabled' : 'disabled'}`);
+  }
+
+  isClickCaptureEnabled(): boolean {
+    return this.clickCaptureEnabled;
   }
 
   cleanup(): void {

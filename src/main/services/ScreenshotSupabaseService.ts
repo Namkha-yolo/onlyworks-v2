@@ -20,6 +20,8 @@ export class ScreenshotSupabaseService {
   private bucketName: string = 'screenshots';
 
   constructor() {
+    // Initialize Supabase with environment credentials
+    console.log('[ScreenshotSupabaseService] Initializing Supabase service...');
     this.initializeSupabase();
   }
 
@@ -89,6 +91,8 @@ export class ScreenshotSupabaseService {
 
         if (createError) {
           console.error('[ScreenshotSupabaseService] Error creating bucket:', createError);
+          // Don't fail - continue without storage
+          console.warn('[ScreenshotSupabaseService] Continuing without storage bucket - will use local fallback');
         } else {
           console.log('[ScreenshotSupabaseService] Screenshots bucket created successfully');
         }

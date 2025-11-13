@@ -57,6 +57,10 @@ export class BackendApiService {
       baseUrl: config?.baseUrl || process.env.ONLYWORKS_SERVER_URL || 'http://localhost:8080',
       timeout: config?.timeout || 30000
     };
+
+    // No default auth token - users must authenticate through OAuth
+    this.authToken = null;
+    console.log('[BackendAPI] Initialized without default authentication - OAuth required');
   }
 
   static getInstance(config?: BackendConfig): BackendApiService {
@@ -342,8 +346,11 @@ export class BackendApiService {
     return this.makeRequest('POST', '/api/sessions/start', sessionData);
   }
 
-  async endSession(sessionId: string): Promise<ApiResponse> {
-    return this.makeRequest('PUT', `/api/sessions/${sessionId}/end`);
+  async endSession(sessionId: string, endData?: {
+    duration_seconds?: number;
+    end_time?: string;
+  }): Promise<ApiResponse> {
+    return this.makeRequest('PUT', `/api/sessions/${sessionId}/end`, endData);
   }
 
   async pauseSession(sessionId: string): Promise<ApiResponse> {
@@ -485,6 +492,61 @@ export class BackendApiService {
     const endpoint = `/api/analysis/patterns${queryString ? `?${queryString}` : ''}`;
 
     return this.makeRequest('GET', endpoint);
+  }
+
+  // Goals endpoints
+  async getGoals(): Promise<ApiResponse> {
+    return this.makeRequest('GET', '/goals');
+  }
+
+  async saveGoals(goalsData: {
+    personalGoals?: any;
+    teamGoals?: any;
+    allGoals?: any[];
+  }): Promise<ApiResponse> {
+    return this.makeRequest('POST', '/goals', goalsData);
+  }
+
+  async updateGoal(goalId: string, goalData: any): Promise<ApiResponse> {
+    return this.makeRequest('PUT', `/goals/${goalId}`, goalData);
+  }
+
+  async deleteGoal(goalId: string): Promise<ApiResponse> {
+    return this.makeRequest('DELETE', `/goals/${goalId}`);
+  }
+
+  // Batch processing endpoints
+  async triggerBatchProcessing(sessionId: string, options: {
+    batchSize?: number;
+    analysisType?: string;
+  } = {}): Promise<ApiResponse> {
+    return this.makeRequest('POST', `/api/batch/trigger/${sessionId}`, options);
+  }
+
+  async getBatchStatus(sessionId: string): Promise<ApiResponse> {
+    return this.makeRequest('GET', `/api/batch/status/${sessionId}`);
+  }
+
+  async getBatchReports(sessionId: string, options: {
+    limit?: number;
+    offset?: number;
+  } = {}): Promise<ApiResponse> {
+    const queryParams = new URLSearchParams();
+
+    Object.entries(options).forEach(([key, value]) => {
+      if (value !== undefined) {
+        queryParams.append(key, value.toString());
+      }
+    });
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/batch/reports/${sessionId}${queryString ? `?${queryString}` : ''}`;
+
+    return this.makeRequest('GET', endpoint);
+  }
+
+  async generateSessionSummary(sessionId: string): Promise<ApiResponse> {
+    return this.makeRequest('GET', `/api/batch/summary/${sessionId}`);
   }
 
   // Generic request method for custom endpoints

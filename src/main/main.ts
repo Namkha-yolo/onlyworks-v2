@@ -197,6 +197,16 @@ class OnlyWorksApp {
       }
     });
 
+    ipcMain.handle('auth:set-token', async (event, token: string) => {
+      try {
+        this.backendApi.setAuthToken(token);
+        console.log('[Main] Auth token set in BackendApiService');
+      } catch (error) {
+        console.error('Set auth token error:', error);
+        throw error;
+      }
+    });
+
     ipcMain.handle('auth:validate-session', async (event, session: any) => {
       try {
         return await this.authService.validateSession(session);
@@ -268,9 +278,9 @@ class OnlyWorksApp {
       }
     });
 
-    ipcMain.handle('api:end-session', async (event, sessionId: string) => {
+    ipcMain.handle('api:end-session', async (event, sessionId: string, endData?: any) => {
       try {
-        const result = await this.backendApi.endSession(sessionId);
+        const result = await this.backendApi.endSession(sessionId, endData);
         if (result.success) {
           broadcastSessionUpdate(null); // No active session
         }

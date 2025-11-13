@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('api', {
   clearSession: () => ipcRenderer.invoke('auth:clear-session'),
   validateSession: (session: any) => ipcRenderer.invoke('auth:validate-session', session),
   refreshAuthToken: (refreshToken: string) => ipcRenderer.invoke('auth:refresh-token', refreshToken),
+  setAuthToken: (token: string) => ipcRenderer.invoke('auth:set-token', token),
 
   // Backend API methods
   healthCheck: () => ipcRenderer.invoke('api:health-check'),
@@ -38,7 +39,7 @@ contextBridge.exposeInMainWorld('api', {
   updateUserProfile: (profileData: any) => ipcRenderer.invoke('api:update-user-profile', profileData),
 
   startSession: (sessionData: { session_name?: string; goal_description?: string }) => ipcRenderer.invoke('api:start-session', sessionData),
-  endSession: (sessionId: string) => ipcRenderer.invoke('api:end-session', sessionId),
+  endSession: (sessionId: string, endData?: any) => ipcRenderer.invoke('api:end-session', sessionId, endData),
   pauseSession: (sessionId: string) => ipcRenderer.invoke('api:pause-session', sessionId),
   resumeSession: (sessionId: string) => ipcRenderer.invoke('api:resume-session', sessionId),
   getActiveSession: () => ipcRenderer.invoke('api:get-active-session'),
@@ -128,6 +129,7 @@ declare global {
       clearSession: () => Promise<void>;
       validateSession: (session: any) => Promise<boolean>;
       refreshAuthToken: (refreshToken: string) => Promise<any>;
+      setAuthToken: (token: string) => Promise<void>;
 
       // Backend API methods
       healthCheck: () => Promise<any>;
@@ -135,7 +137,7 @@ declare global {
       updateUserProfile: (profileData: any) => Promise<any>;
 
       startSession: (sessionData: { session_name?: string; goal_description?: string }) => Promise<any>;
-      endSession: (sessionId: string) => Promise<any>;
+      endSession: (sessionId: string, endData?: any) => Promise<any>;
       pauseSession: (sessionId: string) => Promise<any>;
       resumeSession: (sessionId: string) => Promise<any>;
       getActiveSession: () => Promise<any>;

@@ -130,14 +130,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   initializeAuth: async () => {
-
+    console.log('[AuthStore] Initializing authentication...');
     set({ isLoading: true });
 
     try {
+      // Check if there's a stored session
       const storedSession = await api.getStoredSession();
+      console.log('[AuthStore] Stored session:', storedSession);
 
       if (storedSession) {
+        // Validate the stored session
         const isValid = await api.validateSession(storedSession);
+        console.log('[AuthStore] Session validation result:', isValid);
 
         if (isValid) {
           set({
@@ -146,21 +150,31 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             isAuthenticated: true,
             isLoading: false,
           });
+          console.log('[AuthStore] Successfully restored user session for:', storedSession.user.email);
+          return;
         } else {
-          if (storedSession.refresh_token) {
-            await get().refreshToken();
-          } else {
-            await get().logout();
-          }
+          // Clear invalid session
+          await api.clearSession();
+          console.log('[AuthStore] Cleared invalid session');
         }
-      } else {
-        set({ isLoading: false });
       }
-    } catch (error) {
-      console.error('Auth initialization error:', error);
+
+      // No valid session found
       set({
-        error: error instanceof Error ? error.message : 'Failed to initialize authentication',
+        session: null,
+        user: null,
+        isAuthenticated: false,
         isLoading: false,
+      });
+      console.log('[AuthStore] No valid session found - user needs to login');
+    } catch (error) {
+      console.error('[AuthStore] Error during auth initialization:', error);
+      set({
+        session: null,
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: error instanceof Error ? error.message : 'Authentication initialization failed',
       });
     }
   },

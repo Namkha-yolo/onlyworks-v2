@@ -665,12 +665,17 @@ Base recommendations on focus patterns and productivity data.`;
   /**
    * Call Gemini API with image support for OnlyWorks analysis
    */
-  private async callGeminiAPIWithImages(prompt: string, screenshots: ScreenshotData[]): Promise<any> {
+  private async callGeminiAPIWithImages(prompt: string, screenshots: ScreenshotData[], retryCount: number = 0): Promise<any> {
+    const maxRetries = 3;
+    const baseDelay = 2000; // 2 seconds
     const url = `${this.baseUrl}/models/gemini-2.0-flash:generateContent?key=${this.apiKey}`;
 
     console.log(`[GeminiAnalysisService] API URL: ${this.baseUrl}/models/gemini-2.0-flash:generateContent`);
     console.log(`[GeminiAnalysisService] API Key present: ${!!this.apiKey}`);
     console.log(`[GeminiAnalysisService] Processing ${screenshots.length} screenshots for API call`);
+    if (retryCount > 0) {
+      console.log(`[GeminiAnalysisService] Retry attempt ${retryCount}/${maxRetries}`);
+    }
 
     const parts: any[] = [{ text: prompt }];
 
@@ -720,6 +725,15 @@ Base recommendations on focus patterns and productivity data.`;
         const errorText = await response.text();
         console.error(`[GeminiAnalysisService] API error response status: ${response.status}`);
         console.error(`[GeminiAnalysisService] API error response body: ${errorText}`);
+
+        // Handle rate limiting with exponential backoff
+        if (response.status === 429 && retryCount < maxRetries) {
+          const delay = baseDelay * Math.pow(2, retryCount); // Exponential backoff
+          console.log(`[GeminiAnalysisService] Rate limited. Retrying after ${delay}ms... (attempt ${retryCount + 1}/${maxRetries})`);
+
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return this.callGeminiAPIWithImages(prompt, screenshots, retryCount + 1);
+        }
 
         // Check for common errors
         if (response.status === 400 && errorText.includes('API_KEY_INVALID')) {

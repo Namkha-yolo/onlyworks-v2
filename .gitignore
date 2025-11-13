@@ -34,3 +34,18 @@ release/
 # Temporary files
 *.tmp
 .cache/
+
+# Test artifacts
+*-test.js
+test-*.js
+*.test.js
+
+# Distribution packages
+*.zip
+*.dmg
+dist-electron/
+release-package/
+
+# Database files (keep schema in repo)
+*.db
+*.sqlite

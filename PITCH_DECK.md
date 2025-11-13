@@ -210,7 +210,7 @@
 - Screenshot redaction technology
 - User-controlled data sharing
 
-**3. Seamless UX** ✨
+**3. Seamless UX** ✨wh
 - One-click operation
 - Non-intrusive overlay widget
 - Native desktop integration

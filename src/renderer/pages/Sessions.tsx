@@ -21,10 +21,9 @@ const Sessions: React.FC = () => {
   }, [activeSession]);
 
   const handleStartSession = () => {
-    const goal = prompt('What will you focus on?');
-    if (goal) {
-      startSession('Work Session', goal);
-    }
+    // DEMO MODE - Auto-start with default goal
+    const goal = 'Demo Day Presentation - Working on app features';
+    startSession('Work Session', goal);
   };
 
   const formatElapsedTime = (seconds: number) => {

@@ -75,7 +75,7 @@ export const OnlyWorksAnalyticsView: React.FC<OnlyWorksAnalyticsViewProps> = ({
           personalMacroAlignment: 'Contributing to long-term productivity goals',
           teamMicroAlignment: 'Supporting team productivity standards',
           teamMacroAlignment: 'Contributing to organizational effectiveness',
-          alignmentScore: latestSessionWithReport.report?.summary?.productivity_score,
+          alignmentScore: latestSessionWithReport.report?.summary?.productivity_score || 0,
           misalignments: []
         },
         blockers: {

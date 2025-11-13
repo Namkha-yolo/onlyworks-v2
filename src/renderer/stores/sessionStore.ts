@@ -271,7 +271,32 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       }
 
       console.log(`[SessionStore] Ending session with ID: ${activeSession.id}`);
-      const response = await backendApi.endSession(activeSession.id);
+
+      // Calculate session duration
+      const durationSeconds = Math.floor((Date.now() - activeSession.startTime.getTime()) / 1000);
+      const endTime = new Date().toISOString();
+
+      console.log(`[SessionStore] Session duration: ${durationSeconds} seconds (${Math.round(durationSeconds / 60)} minutes)`);
+
+      // Calculate basic scores based on session duration and activity
+      const basicScores = calculateBasicSessionScores(durationSeconds, activeSession);
+      console.log(`[SessionStore] Calculated basic scores:`, basicScores);
+
+      const response = await backendApi.endSession(activeSession.id, {
+        duration_seconds: durationSeconds,
+        end_time: endTime
+      });
+
+      // Update session scores if the session ended successfully
+      if (response.success && basicScores) {
+        try {
+          console.log(`[SessionStore] Updating session scores for ${activeSession.id}`);
+          await backendApi.updateSessionScores(activeSession.id, basicScores);
+          console.log(`[SessionStore] Session scores updated successfully`);
+        } catch (scoreError) {
+          console.warn('[SessionStore] Failed to update session scores:', scoreError);
+        }
+      }
 
       const stoppedSession: Session = {
         ...activeSession,
@@ -489,3 +514,68 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }
   },
 }));
+
+// Helper function to calculate basic session scores
+function calculateBasicSessionScores(durationSeconds: number, session: Session): {
+  productivity_score: number;
+  focus_score: number;
+} | null {
+  // Don't calculate scores for very short sessions (less than 1 minute)
+  if (durationSeconds < 60) {
+    console.log('[SessionStore] Session too short for scoring (<1 minute)');
+    return null;
+  }
+
+  // Basic productivity scoring based on duration
+  let productivityScore: number;
+  let focusScore: number;
+
+  const durationMinutes = durationSeconds / 60;
+
+  // Productivity score based on duration (1-10 scale)
+  if (durationMinutes >= 120) { // 2+ hours
+    productivityScore = 9.0 + Math.random(); // 9.0-10.0
+  } else if (durationMinutes >= 60) { // 1-2 hours
+    productivityScore = 7.5 + (durationMinutes - 60) / 60 * 1.5; // 7.5-9.0
+  } else if (durationMinutes >= 30) { // 30-60 minutes
+    productivityScore = 6.0 + (durationMinutes - 30) / 30 * 1.5; // 6.0-7.5
+  } else if (durationMinutes >= 15) { // 15-30 minutes
+    productivityScore = 4.5 + (durationMinutes - 15) / 15 * 1.5; // 4.5-6.0
+  } else if (durationMinutes >= 5) { // 5-15 minutes
+    productivityScore = 3.0 + (durationMinutes - 5) / 10 * 1.5; // 3.0-4.5
+  } else { // 1-5 minutes
+    productivityScore = 1.0 + durationMinutes / 5 * 2; // 1.0-3.0
+  }
+
+  // Focus score (similar logic but with different thresholds)
+  if (durationMinutes >= 90) { // 90+ minutes - high focus
+    focusScore = 8.5 + Math.random() * 1.5; // 8.5-10.0
+  } else if (durationMinutes >= 45) { // 45-90 minutes - good focus
+    focusScore = 7.0 + (durationMinutes - 45) / 45 * 1.5; // 7.0-8.5
+  } else if (durationMinutes >= 25) { // 25-45 minutes - moderate focus
+    focusScore = 5.5 + (durationMinutes - 25) / 20 * 1.5; // 5.5-7.0
+  } else if (durationMinutes >= 10) { // 10-25 minutes - low focus
+    focusScore = 3.5 + (durationMinutes - 10) / 15 * 2; // 3.5-5.5
+  } else { // <10 minutes - very low focus
+    focusScore = 1.0 + durationMinutes / 10 * 2.5; // 1.0-3.5
+  }
+
+  // Add small bonus if session has a meaningful goal
+  if (session.goal && session.goal.trim().length > 10) {
+    productivityScore += 0.3;
+    focusScore += 0.2;
+  }
+
+  // Ensure scores are within 1-10 range and round to 1 decimal place
+  productivityScore = Math.min(10.0, Math.max(1.0, Math.round(productivityScore * 10) / 10));
+  focusScore = Math.min(10.0, Math.max(1.0, Math.round(focusScore * 10) / 10));
+
+  console.log(`[SessionStore] Basic score calculation for ${durationMinutes.toFixed(1)} min session:`);
+  console.log(`[SessionStore] - Productivity: ${productivityScore}/10`);
+  console.log(`[SessionStore] - Focus: ${focusScore}/10`);
+
+  return {
+    productivity_score: productivityScore,
+    focus_score: focusScore
+  };
+}

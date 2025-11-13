@@ -62,7 +62,7 @@ const StatusIndicator: React.FC<{ activeSession: any; compact?: boolean }> = ({
   }
 
   return (
-    <div className={`flex items-center gap-2 px-3 py-1.5 ${statusBg} rounded-lg border ${statusBorder} backdrop-blur-sm`}>
+    <div className={`flex items-center gap-2 px-3 py-1.5 ${statusBg}`}>
       <div className={`w-2 h-2 rounded-full ${dotColor}`} />
       <span className="text-white/90 text-xs font-medium select-none">
         {statusText}
@@ -140,7 +140,7 @@ const Overlay: React.FC = () => {
   if (isExpanded && notification) {
     return (
       <div className="w-full h-full flex items-center justify-center" style={{ background: 'transparent' }}>
-        <div className={`bg-black/85 backdrop-blur-md rounded-2xl px-3 py-2 shadow-2xl border border-white/10 flex ${isHorizontal ? 'flex-row' : 'flex-col'} items-center gap-2`} style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
+        <div className={`bg-black px-3 py-2 flex ${isHorizontal ? 'flex-row' : 'flex-col'} items-center gap-2`} style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
           <span className="text-white text-xs font-medium">{notification.memberName} {notification.action} a session</span>
         </div>
@@ -154,12 +154,10 @@ const Overlay: React.FC = () => {
       <div className="w-full h-full flex items-center justify-center" style={{ background: 'transparent' }}>
         <button
           onClick={handleToggleExpand}
-          className="relative group w-[60px] h-[60px] bg-gradient-to-br from-primary-600/95 to-primary-800/95 backdrop-blur-xl rounded-2xl shadow-2xl cursor-pointer border border-white/20 flex items-center justify-center hover:from-primary-500 hover:to-primary-700 transition-all duration-300 hover:scale-110 hover:shadow-primary-500/50"
+          className="relative group w-[60px] h-[60px] bg-gradient-to-br from-primary-600 to-primary-800 cursor-pointer flex items-center justify-center hover:from-primary-500 hover:to-primary-700 transition-all duration-300 hover:scale-110"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           title="Expand OnlyWorks"
         >
-          {/* Glass effect overlay */}
-          <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/20 to-transparent opacity-50" />
 
           {/* OnlyWorks Logo */}
           <div className="relative z-10">
@@ -174,7 +172,7 @@ const Overlay: React.FC = () => {
           {activeSession?.status === 'active' && (
             <>
               <div className="absolute -top-1 -right-1 w-4 h-4 bg-success-500 rounded-full animate-pulse border-2 border-white/20 shadow-lg" />
-              <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-black/80 backdrop-blur-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-black opacity-0 group-hover:opacity-100 transition-opacity">
                 <span className="text-white text-[10px] font-mono">{formattedTime}</span>
               </div>
             </>
@@ -188,14 +186,14 @@ const Overlay: React.FC = () => {
   if (isHorizontal) {
     return (
       <div className="w-full h-full flex items-center justify-center p-2" style={{ background: 'transparent' }}>
-        <div className="bg-gray-900/95 backdrop-blur-xl rounded-2xl px-5 py-3 shadow-2xl cursor-move border border-white/10 flex items-center gap-4 w-full h-full relative overflow-hidden" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
+        <div className="bg-gray-900 px-5 py-3 cursor-move flex items-center gap-4 w-full h-full relative overflow-hidden" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
           {/* Background gradient */}
           <div className="absolute inset-0 bg-gradient-to-br from-primary-600/10 via-transparent to-primary-800/10 pointer-events-none" />
 
           {/* Logo and Collapse Button */}
           <button
             onClick={handleToggleExpand}
-            className="relative w-12 h-12 rounded-xl bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center hover:scale-105 transition-all duration-300 flex-shrink-0 shadow-lg shadow-primary-600/30"
+            className="relative w-12 h-12 bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center hover:scale-105 transition-all duration-300 flex-shrink-0"
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
             title="Collapse"
           >
@@ -289,14 +287,14 @@ const Overlay: React.FC = () => {
   // Expanded State - Vertical Layout (100x280px)
   return (
     <div className="w-full h-full flex items-center justify-center p-2" style={{ background: 'transparent' }}>
-      <div className="bg-gray-900/95 backdrop-blur-xl rounded-2xl px-3 py-4 flex flex-col items-center gap-3 shadow-2xl cursor-move border border-white/10 w-full h-full relative overflow-hidden" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
+      <div className="bg-gray-900 px-3 py-4 flex flex-col items-center gap-3 cursor-move w-full h-full relative overflow-hidden" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
         {/* Background gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary-600/10 via-transparent to-primary-800/10 pointer-events-none" />
 
         {/* Logo and Collapse Button */}
         <button
           onClick={handleToggleExpand}
-          className="relative w-12 h-12 rounded-xl bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center hover:scale-105 transition-all duration-300 shadow-lg shadow-primary-600/30"
+          className="relative w-12 h-12 bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center hover:scale-105 transition-all duration-300"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           title="Collapse"
         >
@@ -312,7 +310,7 @@ const Overlay: React.FC = () => {
 
         {/* Timer Display */}
         {activeSession && (
-          <div className="bg-white/5 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/10">
+          <div className="bg-gray-800 px-3 py-2">
             <span className="text-white text-lg font-mono font-bold block text-center">{formattedTime}</span>
           </div>
         )}

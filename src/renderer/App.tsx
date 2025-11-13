@@ -9,6 +9,7 @@ import Analytics from './pages/Analytics';
 import Reports from './pages/Reports';
 import Goals from './pages/Goals';
 import Welcome from './pages/Welcome';
+import Onboarding from './pages/Onboarding';
 import SettingsSidebar from './components/modals/SettingsSidebar';
 import AuthGuard from './components/auth/AuthGuard';
 import { useThemeStore } from './stores/themeStore';
@@ -25,6 +26,11 @@ const App: React.FC = () => {
   const initializeAuth = useAuthStore((state) => state.initializeAuth);
   const clearLingeringActiveSessions = useSessionStore((state) => state.clearLingeringActiveSessions);
   const { isAuthenticated, isLoading } = useAuthStore();
+
+  // Check onboarding status
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(() => {
+    return localStorage.getItem('onboarding_completed') === 'true';
+  });
 
   useEffect(() => {
     initializeTheme();
@@ -90,6 +96,18 @@ const App: React.FC = () => {
     }
   }, [isAuthenticated, isLoading, clearLingeringActiveSessions]);
 
+  // Listen for onboarding completion
+  useEffect(() => {
+    const handleOnboardingCompleted = () => {
+      setHasCompletedOnboarding(true);
+    };
+
+    window.addEventListener('onboarding-completed', handleOnboardingCompleted);
+    return () => {
+      window.removeEventListener('onboarding-completed', handleOnboardingCompleted);
+    };
+  }, []);
+
   const renderPage = () => {
     switch (currentPage) {
       case 'dashboard':
@@ -126,7 +144,12 @@ const App: React.FC = () => {
     return <Welcome />;
   }
 
-  // Show main app if authenticated
+  // Show onboarding if authenticated but hasn't completed onboarding
+  if (isAuthenticated && !hasCompletedOnboarding) {
+    return <Onboarding />;
+  }
+
+  // Show main app if authenticated and onboarding completed
   return (
     <div className="flex flex-col h-full">
       <TitleBar />

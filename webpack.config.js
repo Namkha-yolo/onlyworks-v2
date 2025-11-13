@@ -29,6 +29,11 @@ const mainConfig = {
       },
     ],
   },
+  externals: {
+    'uiohook-napi': 'commonjs2 uiohook-napi',
+    'robotjs': 'commonjs2 robotjs',
+    '@jitsi/robotjs': 'commonjs2 @jitsi/robotjs'
+  },
   node: {
     __dirname: false,
     __filename: false,

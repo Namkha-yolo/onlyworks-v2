@@ -1,4 +1,5 @@
 import { BackendApiService } from './BackendApiService';
+import { ScreenshotSupabaseService } from './ScreenshotSupabaseService';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
@@ -22,11 +23,14 @@ export interface UploadResult {
 export class ScreenshotUploadService {
   private static instance: ScreenshotUploadService;
   private backendApi: BackendApiService;
+  private supabaseService: ScreenshotSupabaseService;
   private uploadQueue: ScreenshotMetadata[] = [];
   private isProcessing = false;
+  private screenshotCounter = 0; // Track for batch processing
 
   constructor() {
     this.backendApi = BackendApiService.getInstance();
+    this.supabaseService = new ScreenshotSupabaseService();
   }
 
   static getInstance(): ScreenshotUploadService {
@@ -39,34 +43,79 @@ export class ScreenshotUploadService {
   async uploadScreenshot(metadata: ScreenshotMetadata): Promise<UploadResult> {
     try {
       console.log('[ScreenshotUpload] Uploading screenshot:', metadata.filePath);
+      this.screenshotCounter++;
 
-      // Get file stats
+      // Skip if this is already a Supabase URL (already uploaded)
+      if (metadata.filePath.startsWith('supabase://')) {
+        console.log('[ScreenshotUpload] Screenshot already uploaded to Supabase, skipping re-upload');
+        return {
+          success: true,
+          storageKey: metadata.filePath
+        };
+      }
+
+      // Check if file exists before reading
+      try {
+        await fs.access(metadata.filePath);
+      } catch (error) {
+        console.error('[ScreenshotUpload] File not found:', metadata.filePath);
+        return {
+          success: false,
+          error: `File not found: ${metadata.filePath}`
+        };
+      }
+
+      // Read file and convert to base64
+      const fileBuffer = await fs.readFile(metadata.filePath);
+      const base64Data = `data:image/png;base64,${fileBuffer.toString('base64')}`;
       const stats = await fs.stat(metadata.filePath);
-      const fileName = path.basename(metadata.filePath);
 
-      // Generate a unique storage key
-      const storageKey = `screenshots/${metadata.sessionId}/${uuidv4()}-${fileName}`;
-
-      // For now, we'll simulate uploading by creating metadata in the backend
-      // In a real implementation, you'd upload the file to a storage service first
+      // Create screenshot data object for Supabase
       const screenshotData = {
-        file_storage_key: storageKey,
+        id: uuidv4(),
+        sessionId: metadata.sessionId,
+        base64Data,
+        timestamp: new Date(metadata.timestamp).toISOString(),
+        metadata: {
+          fileSize: stats.size,
+          captureTriger: metadata.captureTriger || 'timer_5s',
+          windowTitle: metadata.windowTitle || 'Unknown Window',
+          activeApp: metadata.activeApp || 'Unknown App'
+        }
+      };
+
+      // Upload to Supabase
+      const supabaseResult = await this.supabaseService.uploadScreenshot(screenshotData);
+
+      if (!supabaseResult.success) {
+        console.warn('[ScreenshotUpload] Supabase upload failed, using backend fallback:', supabaseResult.error);
+      }
+
+      // Always store metadata in backend
+      const backendData = {
+        file_storage_key: supabaseResult.storageUrl || `local://${metadata.filePath}`,
         file_size_bytes: stats.size,
         timestamp: new Date(metadata.timestamp).toISOString(),
-        capture_trigger: metadata.captureTriger || 'timer_15s',
+        capture_trigger: metadata.captureTriger || 'timer_5s',
         window_title: metadata.windowTitle,
         active_app: metadata.activeApp
       };
 
-      const response = await this.backendApi.uploadScreenshot(metadata.sessionId, screenshotData);
+      const response = await this.backendApi.uploadScreenshot(metadata.sessionId, backendData);
 
       if (response.success && response.data) {
-        console.log('[ScreenshotUpload] Screenshot uploaded successfully:', response.data.id);
+        console.log('[ScreenshotUpload] Screenshot uploaded successfully:', response.data.id, `(${this.screenshotCounter} total)`);
+
+        // Check if we need to trigger batch processing
+        if (this.screenshotCounter % 30 === 0) {
+          console.log('[ScreenshotUpload] Triggering batch processing for 30 screenshots');
+          this.triggerBatchProcessing(metadata.sessionId);
+        }
 
         return {
           success: true,
           screenshotId: response.data.id,
-          storageKey: storageKey
+          storageKey: supabaseResult.storageUrl || backendData.file_storage_key
         };
       } else {
         console.error('[ScreenshotUpload] Upload failed:', response.error?.message);
@@ -183,6 +232,35 @@ export class ScreenshotUploadService {
       console.error('[ScreenshotUpload] File validation error:', error);
       return false;
     }
+  }
+
+  // Trigger batch processing for AI analysis
+  private async triggerBatchProcessing(sessionId: string): Promise<void> {
+    try {
+      console.log('[ScreenshotUpload] Triggering batch processing for session:', sessionId);
+
+      // Call backend to trigger batch analysis
+      const response = await this.backendApi.triggerBatchProcessing?.(sessionId);
+
+      if (response?.success) {
+        console.log('[ScreenshotUpload] Batch processing triggered successfully');
+      } else {
+        console.error('[ScreenshotUpload] Batch processing trigger failed:', response?.error);
+      }
+    } catch (error) {
+      console.error('[ScreenshotUpload] Error triggering batch processing:', error);
+    }
+  }
+
+  // Get current screenshot counter
+  getScreenshotCounter(): number {
+    return this.screenshotCounter;
+  }
+
+  // Reset screenshot counter (useful for new sessions)
+  resetScreenshotCounter(): void {
+    this.screenshotCounter = 0;
+    console.log('[ScreenshotUpload] Screenshot counter reset');
   }
 }
 
