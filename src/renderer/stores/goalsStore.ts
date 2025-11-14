@@ -169,7 +169,7 @@ export const useGoalsStore = create<GoalsState>()(
         try {
           // Try to load from backend API first
           if (typeof window !== 'undefined' && window.api) {
-            const response = await window.api.apiGet('/goals');
+            const response = await window.api.apiGet('/api/goals');
             if (response.success && response.data) {
               const { personalGoals, teamGoals, allGoals } = response.data;
 
@@ -201,7 +201,7 @@ export const useGoalsStore = create<GoalsState>()(
 
         try {
           if (typeof window !== 'undefined' && window.api) {
-            await window.api.apiPost('/goals', {
+            await window.api.apiPost('/api/goals', {
               personalGoals,
               teamGoals,
               allGoals

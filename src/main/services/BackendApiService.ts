@@ -54,7 +54,7 @@ export class BackendApiService {
 
   constructor(config?: BackendConfig) {
     this.config = {
-      baseUrl: config?.baseUrl || process.env.ONLYWORKS_SERVER_URL || 'http://localhost:8080',
+      baseUrl: config?.baseUrl || process.env.ONLYWORKS_SERVER_URL || 'https://onlyworks-backend-server.onrender.com',
       timeout: config?.timeout || 30000
     };
 
@@ -496,7 +496,7 @@ export class BackendApiService {
 
   // Goals endpoints
   async getGoals(): Promise<ApiResponse> {
-    return this.makeRequest('GET', '/goals');
+    return this.makeRequest('GET', '/api/goals');
   }
 
   async saveGoals(goalsData: {
@@ -504,15 +504,15 @@ export class BackendApiService {
     teamGoals?: any;
     allGoals?: any[];
   }): Promise<ApiResponse> {
-    return this.makeRequest('POST', '/goals', goalsData);
+    return this.makeRequest('POST', '/api/goals', goalsData);
   }
 
   async updateGoal(goalId: string, goalData: any): Promise<ApiResponse> {
-    return this.makeRequest('PUT', `/goals/${goalId}`, goalData);
+    return this.makeRequest('PUT', `/api/goals/${goalId}`, goalData);
   }
 
   async deleteGoal(goalId: string): Promise<ApiResponse> {
-    return this.makeRequest('DELETE', `/goals/${goalId}`);
+    return this.makeRequest('DELETE', `/api/goals/${goalId}`);
   }
 
   // Batch processing endpoints

@@ -48,16 +48,13 @@ export class GeminiAnalysisService {
   constructor() {
     this.apiKey = process.env.GOOGLE_API_KEY || '';
     console.log('[GeminiAnalysisService] Initializing...');
-    console.log('[GeminiAnalysisService] Environment GOOGLE_API_KEY:', process.env.GOOGLE_API_KEY ? `${process.env.GOOGLE_API_KEY.substring(0, 10)}...` : 'NOT SET');
 
+    // Note: In the backend architecture, AI analysis is handled by the backend server
+    // This frontend service is kept for compatibility but should delegate to backend
     if (!this.apiKey) {
-      console.error('[GeminiAnalysisService] ❌ Google API key not found in environment');
-      console.error('[GeminiAnalysisService] Expected key: GOOGLE_API_KEY');
-      console.error('[GeminiAnalysisService] AI analysis will not work without API key');
+      console.log('[GeminiAnalysisService] No local API key - will use backend AI service');
     } else {
       console.log('[GeminiAnalysisService] ✅ API key found, service initialized');
-      console.log(`[GeminiAnalysisService] API key length: ${this.apiKey.length} characters`);
-      console.log(`[GeminiAnalysisService] API key preview: ${this.apiKey.substring(0, 10)}...`);
     }
     this.startContinuousAnalysis();
   }

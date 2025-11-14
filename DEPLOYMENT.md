@@ -52,7 +52,7 @@ The backend server is in a separate repository: `onlyworks-backend-server`
 ### Frontend Configuration
 Set environment variables or update the app to point to your backend:
 ```env
-ONLYWORKS_SERVER_URL=http://localhost:8080
+ONLYWORKS_SERVER_URL=https://onlyworks-backend-server.onrender.com
 ```
 
 ### Backend Configuration

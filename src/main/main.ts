@@ -466,7 +466,7 @@ class OnlyWorksApp {
     // Settings handlers
     ipcMain.handle('api:save-settings', async (event, settings: any) => {
       try {
-        return await this.backendApi.post('/users/settings', settings);
+        return await this.backendApi.post('/api/users/settings', settings);
       } catch (error) {
         console.error('Save settings error:', error);
         throw error;
@@ -475,7 +475,7 @@ class OnlyWorksApp {
 
     ipcMain.handle('api:load-settings', async () => {
       try {
-        return await this.backendApi.get('/users/settings');
+        return await this.backendApi.get('/api/users/settings');
       } catch (error) {
         console.error('Load settings error:', error);
         throw error;

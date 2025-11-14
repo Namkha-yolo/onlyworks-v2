@@ -1153,20 +1153,15 @@ Focus on creating a report that tells the complete story of this work session.`;
 
       try {
         // Store via backend API
-        const response = await fetch('http://localhost:8080/api/analysis/final', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(finalData)
-        });
+        const { BackendApiService } = await import('./BackendApiService');
+        const backendApi = BackendApiService.getInstance();
 
-        if (response.ok) {
-          const result = await response.json();
-          console.log(`[ScreenshotAnalysisService] Final analysis stored successfully:`, result.data);
+        const response = await backendApi.post('/api/analysis/final', finalData);
+
+        if (response.success) {
+          console.log(`[ScreenshotAnalysisService] Final analysis stored successfully:`, response.data);
         } else {
-          const error = await response.json();
-          console.warn(`[ScreenshotAnalysisService] Backend storage failed:`, error);
+          console.warn(`[ScreenshotAnalysisService] Backend storage failed:`, response.error);
           this.storeAnalysisLocally('final', finalData);
         }
       } catch (networkError: any) {

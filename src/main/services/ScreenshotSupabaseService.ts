@@ -1,4 +1,4 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+// Backend API storage service (no direct Supabase access)
 import { ScreenshotData } from '../../shared/types/analysis';
 
 export interface SupabaseUploadResult {
@@ -15,158 +15,121 @@ export interface SupabaseConfig {
 }
 
 export class ScreenshotSupabaseService {
-  private supabase: SupabaseClient | null = null;
   private config: SupabaseConfig | null = null;
   private bucketName: string = 'screenshots';
 
   constructor() {
-    // Initialize Supabase with environment credentials
-    console.log('[ScreenshotSupabaseService] Initializing Supabase service...');
-    this.initializeSupabase();
+    // Initialize backend storage service
+    console.log('[ScreenshotSupabaseService] Initializing backend storage service...');
+    this.initializeBackendStorage();
   }
 
   /**
-   * Initialize Supabase client with environment variables
+   * Initialize storage service to use backend API
    */
-  private initializeSupabase(): void {
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_ANON_KEY; // Use anon key for now
+  private initializeBackendStorage(): void {
+    const backendUrl = process.env.ONLYWORKS_SERVER_URL;
 
-    console.log('[ScreenshotSupabaseService] Initializing Supabase...');
-    console.log('[ScreenshotSupabaseService] URL:', supabaseUrl ? '✅ Set' : '❌ Not Set');
-    console.log('[ScreenshotSupabaseService] Key:', supabaseKey ? '✅ Set' : '❌ Not Set');
+    console.log('[ScreenshotSupabaseService] Initializing storage via backend...');
+    console.log('[ScreenshotSupabaseService] Backend URL:', backendUrl ? '✅ Set' : '❌ Not Set');
 
-    if (!supabaseUrl || !supabaseKey) {
-      console.warn('[ScreenshotSupabaseService] ⚠️ Supabase disabled - credentials not found');
-      console.warn('[ScreenshotSupabaseService] Screenshots will use local storage fallback');
-      return;
+    if (!backendUrl) {
+      console.error('[ScreenshotSupabaseService] ❌ Missing ONLYWORKS_SERVER_URL');
+      throw new Error('Backend URL is required for storage operations');
+    }
+
+    this.config = {
+      url: backendUrl,
+      serviceKey: '', // Not needed for backend approach
+      bucketName: this.bucketName
+    };
+
+    console.log('[ScreenshotSupabaseService] ✅ Storage service initialized (using backend API)');
+    // No need to create bucket - backend will handle this
+  }
+
+  /**
+   * Check backend storage health (replaces bucket creation)
+   */
+  private async checkStorageHealth(): Promise<void> {
+    if (!this.config?.url) {
+      throw new Error('Backend URL not configured');
     }
 
     try {
-      this.config = {
-        url: supabaseUrl,
-        serviceKey: supabaseKey,
-        bucketName: this.bucketName
-      };
-
-      this.supabase = createClient(supabaseUrl, supabaseKey, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      });
-
-      console.log('[ScreenshotSupabaseService] Supabase client initialized successfully');
-      this.ensureBucketExists();
+      const response = await fetch(`${this.config.url}/health`);
+      if (!response.ok) {
+        throw new Error(`Backend health check failed: ${response.status}`);
+      }
+      console.log('[ScreenshotSupabaseService] ✅ Backend storage health check passed');
     } catch (error) {
-      console.error('[ScreenshotSupabaseService] Failed to initialize Supabase:', error);
+      console.error('[ScreenshotSupabaseService] Backend health check failed:', error);
+      throw error;
     }
   }
 
   /**
-   * Ensure the screenshots bucket exists
-   */
-  private async ensureBucketExists(): Promise<void> {
-    if (!this.supabase) return;
-
-    try {
-      // Check if bucket exists
-      const { data: buckets, error: listError } = await this.supabase.storage.listBuckets();
-
-      if (listError) {
-        console.error('[ScreenshotSupabaseService] Error listing buckets:', listError);
-        return;
-      }
-
-      const bucketExists = buckets?.some(bucket => bucket.name === this.bucketName);
-
-      if (!bucketExists) {
-        console.log('[ScreenshotSupabaseService] Creating screenshots bucket...');
-
-        const { error: createError } = await this.supabase.storage.createBucket(this.bucketName, {
-          public: false, // Private bucket for security
-          allowedMimeTypes: ['image/png', 'image/jpeg', 'image/webp'],
-          fileSizeLimit: 10485760 // 10MB limit per file
-        });
-
-        if (createError) {
-          console.error('[ScreenshotSupabaseService] Error creating bucket:', createError);
-          // Don't fail - continue without storage
-          console.warn('[ScreenshotSupabaseService] Continuing without storage bucket - will use local fallback');
-        } else {
-          console.log('[ScreenshotSupabaseService] Screenshots bucket created successfully');
-        }
-      } else {
-        console.log('[ScreenshotSupabaseService] Screenshots bucket already exists');
-      }
-    } catch (error) {
-      console.error('[ScreenshotSupabaseService] Error ensuring bucket exists:', error);
-    }
-  }
-
-  /**
-   * Upload a single screenshot to Supabase Storage
+   * Upload a single screenshot via backend API
    */
   async uploadScreenshot(screenshot: ScreenshotData): Promise<SupabaseUploadResult> {
-    if (!this.supabase || !this.config) {
-      // For development, we'll skip Supabase uploads and return success
-      console.log('[ScreenshotSupabaseService] Skipping Supabase upload - not configured');
-      return {
-        success: true,
-        screenshotId: `local_${screenshot.id}`,
-        storageUrl: `local://screenshot/${screenshot.id}`
-      };
+    if (!this.config?.url) {
+      console.error('[ScreenshotSupabaseService] Backend URL not configured');
+      throw new Error('Backend URL is required for storage operations');
     }
 
     try {
-      // Convert base64 to buffer
-      const base64Data = screenshot.base64Data?.replace(/^data:image\/[a-z]+;base64,/, '') || '';
-
-      if (!base64Data) {
+      if (!screenshot.base64Data) {
         return {
           success: false,
           error: 'No image data found'
         };
       }
 
-      const buffer = Buffer.from(base64Data, 'base64');
+      console.log(`[ScreenshotSupabaseService] Uploading screenshot ${screenshot.id} via backend...`);
 
-      // Generate file path: sessions/{sessionId}/screenshots/{timestamp}_{id}.png
-      const timestamp = new Date(screenshot.timestamp).toISOString().replace(/[:]/g, '-');
-      const filePath = `sessions/${screenshot.sessionId}/screenshots/${timestamp}_${screenshot.id}.png`;
+      // Prepare upload data
+      const uploadData = {
+        screenshot_id: screenshot.id,
+        session_id: screenshot.sessionId,
+        base64_data: screenshot.base64Data,
+        timestamp: screenshot.timestamp,
+        window_title: screenshot.metadata?.windowTitle || '',
+        application: screenshot.metadata?.activeApp || ''
+      };
 
-      console.log(`[ScreenshotSupabaseService] Uploading ${filePath} (${buffer.length} bytes)`);
+      // Send to backend API
+      const response = await fetch(`${this.config.url}/api/screenshots/upload`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(uploadData)
+      });
 
-      // Upload to Supabase Storage
-      const { data, error } = await this.supabase.storage
-        .from(this.bucketName)
-        .upload(filePath, buffer, {
-          contentType: 'image/png',
-          upsert: true, // Overwrite if exists
-          duplex: 'half' // For Node.js compatibility
-        });
-
-      if (error) {
-        console.error('[ScreenshotSupabaseService] Upload error:', error);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[ScreenshotSupabaseService] Backend upload failed:', response.status, errorText);
         return {
           success: false,
-          error: error.message
+          error: `Backend upload failed: ${response.status} ${errorText}`
         };
       }
 
-      // Get public URL
-      const { data: urlData } = this.supabase.storage
-        .from(this.bucketName)
-        .getPublicUrl(filePath);
+      const result = await response.json();
 
-      console.log(`[ScreenshotSupabaseService] Upload successful: ${filePath}`);
-
-      return {
-        success: true,
-        screenshotId: screenshot.id,
-        storageUrl: urlData.publicUrl
-      };
-
+      if (result.success) {
+        console.log(`[ScreenshotSupabaseService] ✅ Screenshot uploaded successfully: ${result.storage_url}`);
+        return {
+          success: true,
+          screenshotId: screenshot.id,
+          storageUrl: result.storage_url
+        };
+      } else {
+        return {
+          success: false,
+          error: result.error || 'Unknown backend error'
+        };
+      }
     } catch (error) {
       console.error('[ScreenshotSupabaseService] Upload failed:', error);
       return {
@@ -180,22 +143,16 @@ export class ScreenshotSupabaseService {
    * Upload multiple screenshots in batch
    */
   async uploadBatch(screenshots: ScreenshotData[]): Promise<SupabaseUploadResult[]> {
-    if (!this.supabase || !this.config) {
-      // For development, return successful results for all screenshots
-      console.log(`[ScreenshotSupabaseService] Skipping batch upload of ${screenshots.length} screenshots - not configured`);
-      return screenshots.map((screenshot) => ({
-        success: true,
-        screenshotId: `local_${screenshot.id}`,
-        storageUrl: `local://screenshot/${screenshot.id}`
-      }));
+    if (!this.config?.url) {
+      throw new Error('Backend URL not configured for batch upload');
     }
 
-    console.log(`[ScreenshotSupabaseService] Starting batch upload of ${screenshots.length} screenshots`);
+    console.log(`[ScreenshotSupabaseService] Starting batch upload of ${screenshots.length} screenshots via backend`);
 
     const startTime = Date.now();
     const results: SupabaseUploadResult[] = [];
 
-    // Process uploads concurrently but limit concurrency to avoid rate limits
+    // Process uploads concurrently but limit concurrency to avoid overwhelming backend
     const concurrencyLimit = 3;
     const chunks: ScreenshotData[][] = [];
 
@@ -208,7 +165,7 @@ export class ScreenshotSupabaseService {
       const chunkResults = await Promise.all(chunkPromises);
       results.push(...chunkResults);
 
-      // Small delay between chunks to be respectful to Supabase
+      // Small delay between chunks to be respectful to backend
       if (chunks.indexOf(chunk) < chunks.length - 1) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
@@ -223,28 +180,32 @@ export class ScreenshotSupabaseService {
   }
 
   /**
-   * Delete screenshots from storage
+   * Delete screenshots from storage via backend API
    */
   async deleteScreenshots(sessionId: string, screenshotIds: string[]): Promise<boolean> {
-    if (!this.supabase || !this.config) {
-      console.error('[ScreenshotSupabaseService] Supabase not initialized');
+    if (!this.config?.url) {
+      console.error('[ScreenshotSupabaseService] Backend URL not configured');
       return false;
     }
 
     try {
-      // Generate file paths for deletion
-      const filePaths = screenshotIds.map(id => `sessions/${sessionId}/screenshots/${id}.png`);
+      const response = await fetch(`${this.config.url}/api/screenshots/delete`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          session_id: sessionId,
+          screenshot_ids: screenshotIds
+        })
+      });
 
-      const { error } = await this.supabase.storage
-        .from(this.bucketName)
-        .remove(filePaths);
-
-      if (error) {
-        console.error('[ScreenshotSupabaseService] Delete error:', error);
+      if (!response.ok) {
+        console.error('[ScreenshotSupabaseService] Delete failed:', response.status);
         return false;
       }
 
-      console.log(`[ScreenshotSupabaseService] Deleted ${filePaths.length} screenshots for session ${sessionId}`);
+      console.log(`[ScreenshotSupabaseService] Deleted ${screenshotIds.length} screenshots for session ${sessionId}`);
       return true;
     } catch (error) {
       console.error('[ScreenshotSupabaseService] Delete failed:', error);
@@ -260,7 +221,7 @@ export class ScreenshotSupabaseService {
     fileCount: number;
     isConfigured: boolean;
   }> {
-    if (!this.supabase || !this.config) {
+    if (!this.config?.url) {
       return {
         bucketSize: 0,
         fileCount: 0,
@@ -269,15 +230,10 @@ export class ScreenshotSupabaseService {
     }
 
     try {
-      const { data, error } = await this.supabase.storage
-        .from(this.bucketName)
-        .list('sessions', {
-          limit: 1000,
-          sortBy: { column: 'created_at', order: 'desc' }
-        });
+      const response = await fetch(`${this.config.url}/api/storage/stats`);
 
-      if (error) {
-        console.error('[ScreenshotSupabaseService] Stats error:', error);
+      if (!response.ok) {
+        console.error('[ScreenshotSupabaseService] Stats request failed:', response.status);
         return {
           bucketSize: 0,
           fileCount: 0,
@@ -285,13 +241,11 @@ export class ScreenshotSupabaseService {
         };
       }
 
-      const fileCount = data?.length || 0;
-      // Note: Supabase doesn't provide direct bucket size info
-      // You'd need to implement a custom solution to track this
+      const data = await response.json();
 
       return {
-        bucketSize: 0, // Would need custom tracking
-        fileCount,
+        bucketSize: data.bucket_size || 0,
+        fileCount: data.file_count || 0,
         isConfigured: true
       };
     } catch (error) {
@@ -305,23 +259,17 @@ export class ScreenshotSupabaseService {
   }
 
   /**
-   * Test Supabase connection
+   * Test backend connection
    */
   async testConnection(): Promise<boolean> {
-    if (!this.supabase || !this.config) {
+    if (!this.config?.url) {
       return false;
     }
 
     try {
-      const { data, error } = await this.supabase.storage.listBuckets();
-
-      if (error) {
-        console.error('[ScreenshotSupabaseService] Connection test failed:', error);
-        return false;
-      }
-
-      console.log('[ScreenshotSupabaseService] Connection test successful');
-      return true;
+      const response = await fetch(`${this.config.url}/health`);
+      console.log('[ScreenshotSupabaseService] Backend connection test:', response.ok);
+      return response.ok;
     } catch (error) {
       console.error('[ScreenshotSupabaseService] Connection test error:', error);
       return false;
@@ -332,7 +280,7 @@ export class ScreenshotSupabaseService {
    * Check if service is properly configured
    */
   isConfigured(): boolean {
-    return !!(this.supabase && this.config);
+    return !!(this.config?.url);
   }
 
   /**
@@ -346,7 +294,7 @@ export class ScreenshotSupabaseService {
     return {
       configured: this.isConfigured(),
       bucketName: this.bucketName,
-      hasCredentials: !!(process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY))
+      hasCredentials: !!process.env.ONLYWORKS_SERVER_URL
     };
   }
 }

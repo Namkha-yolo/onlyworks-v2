@@ -183,7 +183,7 @@ export class AuthService {
   private async handleOAuthCallback(url: string, authWindow: BrowserWindow, resolve: (value: AuthSession | null) => void): Promise<void> {
     try {
       console.log('[AuthService] Checking URL for OAuth callback:', url);
-      console.log('[AuthService] Expected callback pattern: localhost:8080/api/auth/oauth/google/callback');
+      console.log('[AuthService] Expected callback pattern: onlyworks-backend-server.onrender.com/api/auth/oauth/google/callback');
 
       // Check if window has been destroyed
       if (authWindow.isDestroyed()) {
@@ -202,7 +202,8 @@ export class AuthService {
         urlObj.searchParams.has('code') ||
         urlObj.searchParams.has('access_token') ||
         url.includes('#access_token=') ||
-        url.includes('localhost:8080/api/auth/oauth/google/callback')
+        url.includes('onlyworks-backend-server.onrender.com/api/auth/oauth/google/callback') ||
+        urlObj.hostname === 'onlyworks-backend-server.onrender.com'
       );
 
       console.log('[AuthService] isCallback check result:', isCallback);

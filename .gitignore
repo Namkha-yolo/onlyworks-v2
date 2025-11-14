@@ -49,3 +49,4 @@ release-package/
 # Database files (keep schema in repo)
 *.db
 *.sqlite
+.vercel
