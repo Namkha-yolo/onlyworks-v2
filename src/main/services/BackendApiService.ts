@@ -421,7 +421,16 @@ export class BackendApiService {
     return this.makeRequest('POST', `/api/sessions/${sessionId}/screenshots`, screenshotData);
   }
 
+  // Bulk screenshot upload endpoint
+  async uploadScreenshotData(uploadData: any): Promise<ApiResponse> {
+    return this.makeRequest('POST', '/api/screenshots/upload', uploadData);
+  }
+
   // AI Analysis endpoints
+  async requestAnalysis(analysisRequest: any): Promise<ApiResponse> {
+    return this.makeRequest('POST', '/api/ai/analyze', analysisRequest);
+  }
+
   async saveSessionAnalysis(sessionId: string, analysisData: {
     productivity_score: number | null;
     focus_patterns: any;

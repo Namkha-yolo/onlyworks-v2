@@ -1,5 +1,6 @@
 // Backend API storage service (no direct Supabase access)
 import { ScreenshotData } from '../../shared/types/analysis';
+import { BackendApiService } from './BackendApiService';
 
 export interface SupabaseUploadResult {
   success: boolean;
@@ -17,10 +18,12 @@ export interface SupabaseConfig {
 export class ScreenshotSupabaseService {
   private config: SupabaseConfig | null = null;
   private bucketName: string = 'screenshots';
+  private backendApi: BackendApiService;
 
   constructor() {
     // Initialize backend storage service
     console.log('[ScreenshotSupabaseService] Initializing backend storage service...');
+    this.backendApi = BackendApiService.getInstance();
     this.initializeBackendStorage();
   }
 
@@ -97,37 +100,20 @@ export class ScreenshotSupabaseService {
         application: screenshot.metadata?.activeApp || ''
       };
 
-      // Send to backend API
-      const response = await fetch(`${this.config.url}/api/screenshots/upload`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(uploadData)
-      });
+      // Send to backend API using authenticated service
+      const result = await this.backendApi.uploadScreenshotData(uploadData);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[ScreenshotSupabaseService] Backend upload failed:', response.status, errorText);
-        return {
-          success: false,
-          error: `Backend upload failed: ${response.status} ${errorText}`
-        };
-      }
-
-      const result = await response.json();
-
-      if (result.success) {
-        console.log(`[ScreenshotSupabaseService] ✅ Screenshot uploaded successfully: ${result.storage_url}`);
+      if (result.success && result.data) {
+        console.log(`[ScreenshotSupabaseService] ✅ Screenshot uploaded successfully: ${result.data.storage_url}`);
         return {
           success: true,
           screenshotId: screenshot.id,
-          storageUrl: result.storage_url
+          storageUrl: result.data.storage_url
         };
       } else {
         return {
           success: false,
-          error: result.error || 'Unknown backend error'
+          error: result.error?.message || 'Unknown backend error'
         };
       }
     } catch (error) {

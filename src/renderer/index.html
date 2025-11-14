@@ -4,29 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OnlyWorks Desktop v2</title>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://lh3.googleusercontent.com https://via.placeholder.com;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://lh3.googleusercontent.com https://via.placeholder.com;">
 </head>
 <body>
     <div id="root"></div>
-    <script>
-        // Debug script to test window.api availability
-        console.log('=== Testing window.api availability ===');
-        console.log('window:', typeof window);
-        console.log('window.api:', typeof window.api);
-        console.log('window.electronAPI:', typeof window.electronAPI);
-
-        if (window.api) {
-            console.log('window.api methods:', Object.keys(window.api));
-            console.log('✅ window.api is available!');
-        } else {
-            console.log('❌ window.api is NOT available!');
-        }
-
-        if (window.electronAPI) {
-            console.log('window.electronAPI methods:', Object.keys(window.electronAPI));
-        }
-
-        // OAuth test removed - authentication now handled through UI
-    </script>
 </body>
 </html>

@@ -7,6 +7,7 @@ import {
   AnalysisResponse,
   ScreenshotData
 } from '../../shared/types/analysis';
+import { BackendApiService } from './BackendApiService';
 
 // Legacy interface for backward compatibility
 export interface AIAnalysisResult {
@@ -44,9 +45,11 @@ export class GeminiAnalysisService {
   private continuousAnalysisQueue: ScreenshotData[] = [];
   private isProcessingContinuous: boolean = false;
   private batchProcessingInterval: NodeJS.Timeout | null = null;
+  private backendApi: BackendApiService;
 
   constructor() {
     this.apiKey = process.env.GOOGLE_API_KEY || '';
+    this.backendApi = BackendApiService.getInstance();
     console.log('[GeminiAnalysisService] Initializing...');
 
     // Note: In the backend architecture, AI analysis is handled by the backend server
@@ -329,15 +332,38 @@ export class GeminiAnalysisService {
     console.log(`[GeminiAnalysisService] Session ID: ${request.context.session.id}`);
 
     if (!this.apiKey) {
-      console.error('[GeminiAnalysisService] Analysis failed - no API key');
-      return {
-        success: false,
-        error: {
-          code: 'NO_API_KEY',
-          message: 'Gemini API key not configured'
-        },
-        metadata: { requestId, processingTime: Date.now() - startTime }
-      };
+      console.log('[GeminiAnalysisService] No local API key - delegating to backend AI service');
+      try {
+        const result = await this.backendApi.requestAnalysis(request);
+        const processingTime = Date.now() - startTime;
+
+        if (result.success && result.data) {
+          console.log(`[GeminiAnalysisService] Backend analysis completed successfully in ${processingTime}ms`);
+          return {
+            success: true,
+            data: result.data,
+            metadata: { requestId, processingTime }
+          };
+        } else {
+          console.error('[GeminiAnalysisService] Backend analysis failed:', result.error);
+          return {
+            success: false,
+            error: result.error || { code: 'BACKEND_ERROR', message: 'Backend analysis failed' },
+            metadata: { requestId, processingTime }
+          };
+        }
+      } catch (error) {
+        const processingTime = Date.now() - startTime;
+        console.error('[GeminiAnalysisService] Backend analysis error:', error);
+        return {
+          success: false,
+          error: {
+            code: 'BACKEND_UNAVAILABLE',
+            message: 'Backend AI service unavailable'
+          },
+          metadata: { requestId, processingTime }
+        };
+      }
     }
 
     try {
