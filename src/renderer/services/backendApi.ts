@@ -213,7 +213,14 @@ class BackendApiService {
       return window.api.clearSession();
     }
 
-    console.log('[BackendAPI] Mock clear session');
+    // Fallback to localStorage for development/web mode
+    console.log('[BackendAPI] Using localStorage fallback for clearing session');
+    try {
+      localStorage.removeItem('onlyworks_auth_session');
+    } catch (error) {
+      console.error('[BackendAPI] Error clearing session from localStorage:', error);
+      throw error;
+    }
   }
 
   async getStoredSession(): Promise<AuthSession | null> {
@@ -221,8 +228,15 @@ class BackendApiService {
       return window.api.getStoredSession();
     }
 
-    console.log('[BackendAPI] Mock get stored session');
-    return null;
+    // Fallback to localStorage for development/web mode
+    console.log('[BackendAPI] Using localStorage fallback for session storage');
+    try {
+      const storedSession = localStorage.getItem('onlyworks_auth_session');
+      return storedSession ? JSON.parse(storedSession) : null;
+    } catch (error) {
+      console.error('[BackendAPI] Error reading session from localStorage:', error);
+      return null;
+    }
   }
 
   async storeSession(session: AuthSession): Promise<void> {
@@ -230,7 +244,14 @@ class BackendApiService {
       return window.api.storeSession(session);
     }
 
-    console.log('[BackendAPI] Mock store session:', session);
+    // Fallback to localStorage for development/web mode
+    console.log('[BackendAPI] Using localStorage fallback for session storage');
+    try {
+      localStorage.setItem('onlyworks_auth_session', JSON.stringify(session));
+    } catch (error) {
+      console.error('[BackendAPI] Error storing session to localStorage:', error);
+      throw error;
+    }
   }
 
   async validateSession(session: AuthSession): Promise<boolean> {
@@ -238,8 +259,32 @@ class BackendApiService {
       return window.api.validateSession(session);
     }
 
-    console.log('[BackendAPI] Mock validate session:', session);
-    return session.expires_at ? session.expires_at > Date.now() : true;
+    // Fallback validation for development/web mode
+    console.log('[BackendAPI] Using fallback session validation');
+
+    if (!session) return false;
+
+    // Check if token is expired (basic validation)
+    if (session.expires_at && session.expires_at <= Date.now()) {
+      console.log('[BackendAPI] Session expired');
+      return false;
+    }
+
+    // For development mode, use the demo user token validation
+    if (session.access_token?.endsWith('.development-signature')) {
+      console.log('[BackendAPI] Development token detected, validating format');
+      try {
+        const [header, payload] = session.access_token.split('.');
+        const decodedPayload = JSON.parse(atob(payload));
+        return decodedPayload.email === 'kewadallay@gmail.com';
+      } catch (error) {
+        console.error('[BackendAPI] Invalid development token format:', error);
+        return false;
+      }
+    }
+
+    // For production tokens, assume valid if not expired
+    return true;
   }
 
   async refreshAuthToken(refreshToken: string): Promise<AuthSession | null> {
