@@ -264,6 +264,10 @@ export class AuthService {
           try {
             const response = await this.backendApi.get(`/api/auth/oauth/google/callback?code=${code}&state=${urlObj.searchParams.get('state')}`);
 
+            console.log('[AuthService] 🔍 BACKEND RESPONSE:', JSON.stringify(response, null, 2));
+            console.log('[AuthService] Response success:', response.success);
+            console.log('[AuthService] Response data:', response.data);
+
             if (!response.success) {
               console.error('[AuthService] Server code exchange error:', response.error);
               this.safeCloseWindow(authWindow);
