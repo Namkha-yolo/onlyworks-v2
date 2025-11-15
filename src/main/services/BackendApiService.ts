@@ -558,6 +558,96 @@ export class BackendApiService {
     return this.makeRequest('GET', `/api/batch/summary/${sessionId}`);
   }
 
+  /**
+   * Upload a file using multipart/form-data
+   */
+  async uploadFile(
+    endpoint: string,
+    fileBuffer: Buffer,
+    fileName: string,
+    additionalData?: Record<string, any>
+  ): Promise<ApiResponse> {
+    try {
+      const url = `${this.config.baseUrl}${endpoint}`;
+
+      console.log(`[BackendAPI] [FILE UPLOAD] === REQUEST START ===`);
+      console.log(`[BackendAPI] [FILE UPLOAD] POST ${url}`);
+      console.log(`[BackendAPI] [FILE UPLOAD] File: ${fileName} (${fileBuffer.length} bytes)`);
+
+      // Create FormData
+      const formData = new FormData();
+
+      // Convert Buffer to Blob - TypeScript has issues with Buffer/ArrayBuffer in Electron
+      // @ts-ignore - Buffer.buffer works at runtime despite type mismatch
+      const blob = new Blob([fileBuffer.buffer], { type: 'image/png' });
+      formData.append('screenshot', blob, fileName);
+
+      // Add additional fields
+      if (additionalData) {
+        Object.entries(additionalData).forEach(([key, value]) => {
+          formData.append(key, typeof value === 'string' ? value : JSON.stringify(value));
+        });
+        console.log(`[BackendAPI] [FILE UPLOAD] Additional fields:`, Object.keys(additionalData));
+      }
+
+      // Prepare headers (don't set Content-Type - let fetch set it with boundary)
+      const headers: Record<string, string> = {};
+      if (this.authToken) {
+        headers['Authorization'] = `Bearer ${this.authToken}`;
+        console.log(`[BackendAPI] [FILE UPLOAD] Using auth token`);
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: formData,
+        signal: AbortSignal.timeout(this.config.timeout)
+      });
+
+      console.log(`[BackendAPI] [FILE UPLOAD] Response status: ${response.status}`);
+
+      const responseText = await response.text();
+      console.log(`[BackendAPI] [FILE UPLOAD] Raw response:`, responseText.substring(0, 200));
+
+      let parsedData;
+      try {
+        parsedData = responseText ? JSON.parse(responseText) : {};
+      } catch {
+        parsedData = { message: responseText };
+      }
+
+      if (response.ok) {
+        console.log(`[BackendAPI] [FILE UPLOAD] === REQUEST SUCCESS ===`);
+        return {
+          success: true,
+          data: parsedData
+        };
+      } else {
+        console.log(`[BackendAPI] [FILE UPLOAD] === REQUEST FAILED (HTTP ${response.status}) ===`);
+        return {
+          success: false,
+          error: {
+            code: `HTTP_${response.status}`,
+            message: parsedData.message || `HTTP ${response.status}: ${response.statusText}`,
+            details: parsedData,
+            timestamp: new Date().toISOString()
+          }
+        };
+      }
+    } catch (error) {
+      console.error(`[BackendAPI] [FILE UPLOAD] === REQUEST FAILED ===`);
+      console.error(`[BackendAPI] [FILE UPLOAD] Error:`, error);
+      return {
+        success: false,
+        error: {
+          code: error instanceof Error && error.name === 'AbortError' ? 'TIMEOUT' : 'UPLOAD_ERROR',
+          message: (error as Error).message,
+          timestamp: new Date().toISOString()
+        }
+      };
+    }
+  }
+
   // Generic request method for custom endpoints
   async get<T = any>(endpoint: string): Promise<ApiResponse<T>> {
     return this.makeRequest('GET', endpoint);

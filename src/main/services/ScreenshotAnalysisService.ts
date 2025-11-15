@@ -188,7 +188,7 @@ export class ScreenshotAnalysisService {
     this.disableEventTriggers();
 
     // Upload any remaining screenshots
-    await this.processUploadQueue(1); // Force upload all remaining
+    await this.processUploadQueue(this.uploadQueue.length); // Upload all remaining
 
     // For short sessions with minimal screenshots, force analysis even with few screenshots
     if (this.currentSession) {
@@ -270,7 +270,8 @@ export class ScreenshotAnalysisService {
         id: `screenshot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         sessionId: this.currentSession || 'unknown',
         timestamp: new Date().toISOString(),
-        base64Data: `data:image/png;base64,${processedData.toString('base64')}`,
+        base64Data: `data:image/png;base64,${processedData.toString('base64')}`,  // Keep for compatibility
+        fileBuffer: processedData,  // Upload buffer directly (preferred method)
         metadata: {
           windowTitle: activeWindow.title,
           activeApp: activeWindow.app,
@@ -286,7 +287,8 @@ export class ScreenshotAnalysisService {
       this.screenshots.push(screenshotData);
       this.uploadQueue.push(screenshotData);
 
-      console.log(`[ScreenshotAnalysisService] 📷 Screenshot captured: ${triggerInfo.triggerType} | Queue: ${this.uploadQueue.length} | Total: ${this.screenshots.length}`);
+      console.log(`[ScreenshotAnalysisService] 📷 Screenshot captured: ${triggerInfo.triggerType}`);
+      console.log(`[ScreenshotAnalysisService]    Queue size: ${this.uploadQueue.length}, isUploading: ${this.isUploading}, Total screenshots: ${this.screenshots.length}`);
       if (triggerInfo.mousePosition) {
         console.log(`[ScreenshotAnalysisService]   Click position: (${triggerInfo.mousePosition.x}, ${triggerInfo.mousePosition.y})`);
       }
@@ -659,53 +661,49 @@ export class ScreenshotAnalysisService {
    * Process upload queue in batches to Supabase and Local Storage
    */
   private async processUploadQueue(batchSize: number): Promise<void> {
-    if (this.isUploading || this.uploadQueue.length < batchSize) {
+    if (this.isUploading) {
+      console.log('[ScreenshotAnalysisService] ⚠️ Upload already in progress, skipping');
+      return;
+    }
+
+    if (this.uploadQueue.length === 0) {
+      console.log('[ScreenshotAnalysisService] ℹ️ Upload queue is empty');
       return;
     }
 
     this.isUploading = true;
     const batch = this.uploadQueue.splice(0, batchSize);
 
-    console.log(`[ScreenshotAnalysisService] Processing upload batch of ${batch.length} screenshots`);
+    console.log(`[ScreenshotAnalysisService] Processing upload batch of ${batch.length} screenshots (direct upload, no local storage)`);
 
     try {
-      // Try Supabase first
+      // Upload directly to backend via Supabase service
       const supabaseResults = await this.supabaseService.uploadBatch(batch);
       const supabaseSuccessCount = supabaseResults.filter(r => r.success).length;
       const supabaseFailedCount = supabaseResults.length - supabaseSuccessCount;
 
-      console.log(`[ScreenshotAnalysisService] Supabase upload: ${supabaseSuccessCount} success, ${supabaseFailedCount} failed`);
+      console.log(`[ScreenshotAnalysisService] Backend upload: ${supabaseSuccessCount} success, ${supabaseFailedCount} failed`);
 
-      // For failed Supabase uploads, try local storage as fallback
-      const failedUploads = supabaseResults
-        .map((result, index) => result.success ? null : batch[index])
-        .filter(Boolean) as ScreenshotData[];
+      // Save storage URLs back to screenshot objects
+      supabaseResults.forEach((result, index) => {
+        if (result.success && result.storageUrl) {
+          const screenshot = batch[index];
+          const screenshotIndex = this.screenshots.findIndex(s => s.id === screenshot.id);
+          if (screenshotIndex !== -1) {
+            this.screenshots[screenshotIndex].supabaseUrl = result.storageUrl;
+            console.log(`[ScreenshotAnalysisService]    ✅ Saved storage URL for ${screenshot.id}: ${result.storageUrl}`);
+          }
+        }
+      });
 
-      if (failedUploads.length > 0) {
-        console.log(`[ScreenshotAnalysisService] Using local storage fallback for ${failedUploads.length} failed uploads`);
-
-        const localResults = await this.localService.saveBatch(failedUploads);
-        const localSuccessCount = localResults.filter(r => r.success).length;
-        const localFailedCount = localResults.length - localSuccessCount;
-
-        console.log(`[ScreenshotAnalysisService] Local storage: ${localSuccessCount} success, ${localFailedCount} failed`);
-
-        // Only add truly failed uploads back to queue
-        const totallyFailedUploads = localResults
-          .map((result, index) => result.success ? null : failedUploads[index])
+      // Add failed uploads back to queue for retry
+      if (supabaseFailedCount > 0) {
+        const failedUploads = supabaseResults
+          .map((result, index) => result.success ? null : batch[index])
           .filter(Boolean) as ScreenshotData[];
 
-        if (totallyFailedUploads.length > 0) {
-          this.uploadQueue.unshift(...totallyFailedUploads);
-          console.log(`[ScreenshotAnalysisService] ${totallyFailedUploads.length} completely failed uploads added back to queue`);
-        }
-      }
-
-      // Also save all screenshots to local storage for backup
-      if (supabaseSuccessCount > 0) {
-        const successfulBatch = batch.filter((_, index) => supabaseResults[index].success);
-        await this.localService.saveBatch(successfulBatch);
-        console.log(`[ScreenshotAnalysisService] Backed up ${successfulBatch.length} screenshots to local storage`);
+        this.uploadQueue.unshift(...failedUploads);
+        console.log(`[ScreenshotAnalysisService] ${failedUploads.length} failed uploads added back to queue for retry`);
       }
 
       // Notify backend about successfully stored screenshots
@@ -713,31 +711,9 @@ export class ScreenshotAnalysisService {
 
     } catch (error) {
       console.error('[ScreenshotAnalysisService] Batch upload error:', error);
-
-      // Try local storage for the entire batch as fallback
-      try {
-        console.log(`[ScreenshotAnalysisService] Using local storage fallback for entire batch`);
-        const localResults = await this.localService.saveBatch(batch);
-        const localSuccessCount = localResults.filter(r => r.success).length;
-
-        console.log(`[ScreenshotAnalysisService] Local storage fallback: ${localSuccessCount} success`);
-
-        // Notify backend about locally stored screenshots
-        await this.notifyBackendOfLocalScreenshots(batch, localResults);
-
-        // Add failed local saves back to queue
-        const localFailedUploads = localResults
-          .map((result, index) => result.success ? null : batch[index])
-          .filter(Boolean) as ScreenshotData[];
-
-        if (localFailedUploads.length > 0) {
-          this.uploadQueue.unshift(...localFailedUploads);
-        }
-      } catch (localError) {
-        console.error('[ScreenshotAnalysisService] Local storage fallback also failed:', localError);
-        // Add batch back to front of queue for retry
-        this.uploadQueue.unshift(...batch);
-      }
+      // Add batch back to front of queue for retry
+      this.uploadQueue.unshift(...batch);
+      console.log(`[ScreenshotAnalysisService] Entire batch added back to queue due to error`);
     } finally {
       this.isUploading = false;
     }
@@ -755,7 +731,7 @@ export class ScreenshotAnalysisService {
     this.disableEventTriggers();
 
     // Upload any remaining screenshots
-    await this.processUploadQueue(1);
+    await this.processUploadQueue(this.uploadQueue.length);
 
     // Screenshots remain in memory - no clearing
     this.isCapturing = false;
@@ -781,7 +757,7 @@ export class ScreenshotAnalysisService {
   async forceUploadQueue(): Promise<void> {
     if (this.uploadQueue.length > 0) {
       console.log(`[ScreenshotAnalysisService] Force uploading ${this.uploadQueue.length} queued screenshots`);
-      await this.processUploadQueue(1); // Upload all remaining
+      await this.processUploadQueue(this.uploadQueue.length); // Upload all remaining
     }
   }
 
