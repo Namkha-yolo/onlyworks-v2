@@ -65,16 +65,15 @@ export class ScreenshotUploadService {
         };
       }
 
-      // Read file and convert to base64
+      // Read file as buffer (no base64 conversion needed)
       const fileBuffer = await fs.readFile(metadata.filePath);
-      const base64Data = `data:image/png;base64,${fileBuffer.toString('base64')}`;
       const stats = await fs.stat(metadata.filePath);
 
       // Create screenshot data object for Supabase
       const screenshotData = {
         id: uuidv4(),
         sessionId: metadata.sessionId,
-        base64Data,
+        fileBuffer,  // Pass buffer directly instead of base64
         timestamp: new Date(metadata.timestamp).toISOString(),
         metadata: {
           fileSize: stats.size,

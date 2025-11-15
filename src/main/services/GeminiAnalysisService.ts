@@ -334,7 +334,17 @@ export class GeminiAnalysisService {
     if (!this.apiKey) {
       console.log('[GeminiAnalysisService] No local API key - delegating to backend AI service');
       try {
-        const result = await this.backendApi.requestAnalysis(request);
+        // Restructure request to match backend expectations (top-level screenshots)
+        const backendRequest = {
+          screenshots: request.context.screenshots,
+          session_id: request.context.session.id,
+          metadata: {
+            session_goal: request.context.session.goal,
+            user_goals: request.context.goals,
+            analysis_options: request.options
+          }
+        };
+        const result = await this.backendApi.requestAnalysis(backendRequest);
         const processingTime = Date.now() - startTime;
 
         if (result.success && result.data) {

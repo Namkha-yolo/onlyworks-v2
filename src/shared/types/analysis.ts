@@ -117,6 +117,7 @@ export interface ScreenshotData {
   sessionId?: string;
   timestamp: string;
   base64Data?: string;
+  fileBuffer?: Buffer;  // PNG buffer for direct upload (no local storage)
   supabaseUrl?: string; // URL after upload to Supabase
   metadata: {
     windowTitle: string;

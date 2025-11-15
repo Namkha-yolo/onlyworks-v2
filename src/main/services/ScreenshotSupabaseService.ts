@@ -74,41 +74,61 @@ export class ScreenshotSupabaseService {
   /**
    * Upload a single screenshot via backend API
    */
-  async uploadScreenshot(screenshot: ScreenshotData): Promise<SupabaseUploadResult> {
+  async uploadScreenshot(screenshot: ScreenshotData & { fileBuffer?: Buffer }): Promise<SupabaseUploadResult> {
     if (!this.config?.url) {
       console.error('[ScreenshotSupabaseService] Backend URL not configured');
       throw new Error('Backend URL is required for storage operations');
     }
 
     try {
-      if (!screenshot.base64Data) {
+      if (!screenshot.fileBuffer && !screenshot.base64Data) {
         return {
           success: false,
-          error: 'No image data found'
+          error: 'No image data found (neither fileBuffer nor base64Data)'
         };
       }
 
       console.log(`[ScreenshotSupabaseService] Uploading screenshot ${screenshot.id} via backend...`);
 
-      // Prepare upload data
-      const uploadData = {
-        screenshot_id: screenshot.id,
-        session_id: screenshot.sessionId,
-        base64_data: screenshot.base64Data,
-        timestamp: screenshot.timestamp,
-        window_title: screenshot.metadata?.windowTitle || '',
-        application: screenshot.metadata?.activeApp || ''
-      };
+      let result;
 
-      // Send to backend API using authenticated service
-      const result = await this.backendApi.uploadScreenshotData(uploadData);
+      // Use fileBuffer if available (preferred method)
+      if (screenshot.fileBuffer) {
+        console.log(`[ScreenshotSupabaseService] Using file buffer upload (${screenshot.fileBuffer.length} bytes)`);
+
+        const fileName = `${screenshot.id}.png`;
+        const additionalData = {
+          screenshot_id: screenshot.id,
+          sessionId: screenshot.sessionId,
+          timestamp: screenshot.timestamp,
+          window_title: screenshot.metadata?.windowTitle || '',
+          active_app: screenshot.metadata?.activeApp || ''
+        };
+
+        result = await this.backendApi.uploadFile('/api/screenshots/upload', screenshot.fileBuffer, fileName, additionalData);
+      } else {
+        // Fallback to base64 (legacy)
+        console.log(`[ScreenshotSupabaseService] Using base64 upload (legacy)`);
+
+        const uploadData = {
+          screenshot_id: screenshot.id,
+          sessionId: screenshot.sessionId,
+          base64_data: screenshot.base64Data,
+          timestamp: screenshot.timestamp,
+          window_title: screenshot.metadata?.windowTitle || '',
+          active_app: screenshot.metadata?.activeApp || ''
+        };
+
+        result = await this.backendApi.uploadScreenshotData(uploadData);
+      }
 
       if (result.success && result.data) {
-        console.log(`[ScreenshotSupabaseService] ✅ Screenshot uploaded successfully: ${result.data.storage_url}`);
+        const storageUrl = result.data.storage_url || result.data.data?.file_storage_key || result.data.file_storage_key;
+        console.log(`[ScreenshotSupabaseService] ✅ Screenshot uploaded successfully: ${storageUrl}`);
         return {
           success: true,
           screenshotId: screenshot.id,
-          storageUrl: result.data.storage_url
+          storageUrl
         };
       } else {
         return {
