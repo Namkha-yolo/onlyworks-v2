@@ -166,82 +166,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         }
       } else {
         console.error('Failed to start session:', response.error);
-        // Fallback to mock for now
-        const newSession: Session = {
-          id: `session-${Date.now()}`,
-          sessionName,
-          goal,
-          startTime: new Date(),
-          duration: 0,
-          status: 'active',
-        };
-        set({ activeSession: newSession });
-
-        // Start screenshot capture for the fallback session
-        if (typeof window !== 'undefined' && window.api && window.api.startScreenshotCapture) {
-          try {
-            // Get current goals from the goals store
-            const goalsState = useGoalsStore.getState();
-            const goals = {
-              personalMicro: goalsState.personalGoals.micro,
-              personalMacro: goalsState.personalGoals.macro,
-              teamMicro: goalsState.teamGoals.micro,
-              teamMacro: goalsState.teamGoals.macro
-            };
-
-            await window.api.startScreenshotCapture(newSession.id, {
-              interval: 5000, // 5 seconds for more frequent captures
-              quality: 80,
-              includeMousePosition: true,
-              privacyMode: false,
-              enableEventTriggers: true, // Enable click/key triggers
-              sessionGoal: goal, // Pass the session goal
-              userGoals: goals // Pass user goals
-            });
-            console.log(`[Session] Screenshot capture started for fallback session: ${newSession.id}`);
-          } catch (captureError) {
-            console.error('Failed to start screenshot capture for fallback session:', captureError);
-          }
-        }
+        throw new Error(`Failed to start session: ${response.error?.message || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error starting session:', error);
-      // Fallback to mock for now
-      const newSession: Session = {
-        id: `session-${Date.now()}`,
-        sessionName,
-        goal,
-        startTime: new Date(),
-        duration: 0,
-        status: 'active',
-      };
-      set({ activeSession: newSession });
-
-      // Start screenshot capture for the error fallback session
-      if (typeof window !== 'undefined' && window.api && window.api.startScreenshotCapture) {
-        try {
-          // Get current goals from the goals store
-          const goalsState = useGoalsStore.getState();
-          const goals = {
-            personalMicro: goalsState.personalGoals.micro,
-            personalMacro: goalsState.personalGoals.macro,
-            teamMicro: goalsState.teamGoals.micro,
-            teamMacro: goalsState.teamGoals.macro
-          };
-
-          await window.api.startScreenshotCapture(newSession.id, {
-            interval: 30000, // 30 seconds
-            quality: 80,
-            includeMousePosition: false,
-            privacyMode: false,
-            sessionGoal: goal, // Pass the session goal
-            userGoals: goals // Pass user goals
-          });
-          console.log(`[Session] Screenshot capture started for error fallback session: ${newSession.id}`);
-        } catch (captureError) {
-          console.error('Failed to start screenshot capture for error fallback session:', captureError);
-        }
-      }
+      throw error; // Re-throw to let the UI handle the error
     }
   },
 
